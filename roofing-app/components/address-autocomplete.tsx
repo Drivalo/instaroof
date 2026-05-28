@@ -20,6 +20,8 @@ export type AddressPlaceDetails = {
   latitude: number;
   longitude: number;
   zipCode: string;
+  /** ISO 3166-1 alpha-2 from Google Places (e.g. GB, AU, NZ, US) */
+  countryCode: string;
 };
 
 type AddressAutocompleteProps = {
@@ -120,11 +122,16 @@ export default function AddressAutocomplete({
             place?.address_components?.find((c: { types: string[]; short_name: string }) =>
               c.types.includes("postal_code"),
             )?.short_name || "";
+          const countryCode =
+            place?.address_components?.find((c: { types: string[]; short_name: string }) =>
+              c.types.includes("country"),
+            )?.short_name || "";
           onPlaceSelectedRef.current?.({
             address: formatted,
             latitude: place?.geometry?.location?.lat() || 0,
             longitude: place?.geometry?.location?.lng() || 0,
             zipCode: zip,
+            countryCode,
           });
         });
       })

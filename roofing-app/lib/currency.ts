@@ -1,0 +1,189 @@
+import { SettingsRow } from "@/lib/types";
+
+export type CurrencyRegion = "US" | "GB" | "AU" | "NZ";
+
+export type CurrencyRates = {
+  gbp: number;
+  aud: number;
+  nzd: number;
+};
+
+export const DEFAULT_CURRENCY_RATES: CurrencyRates = {
+  gbp: 0.79,
+  aud: 1.53,
+  nzd: 1.64,
+};
+
+const REGION_META: Record<
+  CurrencyRegion,
+  { code: string; label: string; formatRange: (low: number, high: number) => string }
+> = {
+  US: {
+    code: "USD",
+    label: "US Dollars",
+    formatRange: (low, high) => `$${fmt(low)} - $${fmt(high)} USD`,
+  },
+  GB: {
+    code: "GBP",
+    label: "British Pounds",
+    formatRange: (low, high) => `£${fmt(low)} - £${fmt(high)} GBP`,
+  },
+  AU: {
+    code: "AUD",
+    label: "Australian Dollars",
+    formatRange: (low, high) => `AUD $${fmt(low)} - AUD $${fmt(high)}`,
+  },
+  NZ: {
+    code: "NZD",
+    label: "New Zealand Dollars",
+    formatRange: (low, high) => `NZD $${fmt(low)} - NZD $${fmt(high)}`,
+  },
+};
+
+function fmt(amount: number) {
+  return Math.round(amount).toLocaleString("en-US");
+}
+
+function regionFromCountryCode(countryCode?: string | null): CurrencyRegion | null {
+  const code = countryCode?.trim().toUpperCase();
+  if (!code) return null;
+  if (code === "GB" || code === "UK") return "GB";
+  if (code === "AU") return "AU";
+  if (code === "NZ") return "NZ";
+  if (code === "US") return "US";
+  return null;
+}
+
+/** Fallback when country code is missing (older leads). */
+function regionFromCoordinates(lat?: number | null, lng?: number | null): CurrencyRegion | null {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat >= -47 && lat <= -34 && lng >= 166 && lng <= 179) return "NZ";
+  if (lat >= -44 && lat <= -10 && lng >= 113 && lng <= 154) return "AU";
+  if (lat >= 49 && lat <= 61 && lng >= -8.5 && lng <= 2.5) return "GB";
+  if (lat >= 24 && lat <= 50 && lng >= -125 && lng <= -66) return "US";
+  return null;
+}
+
+/** Detect market from Google country code, address text, or coordinates. */
+export function detectCurrencyRegion(
+  address?: string | null,
+  countryCode?: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
+): CurrencyRegion {
+  const fromCode = regionFromCountryCode(countryCode);
+  if (fromCode) return fromCode;
+
+  if (address?.trim()) {
+    const normalized = address.trim().toLowerCase();
+    const raw = address.trim();
+
+    if (
+      /,\s*(uk|gb|united kingdom)\s*$/i.test(raw) ||
+      /\b(uk|united kingdom|great britain|england|scotland|wales|northern ireland)\b/i.test(normalized) ||
+      /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i.test(raw)
+    ) {
+      return "GB";
+    }
+
+    if (
+      /,\s*(australia)\s*$/i.test(raw) ||
+      /\b(australia|australian)\b/i.test(normalized) ||
+      /\b(nsw|vic|qld|sa|tas|nt|act)\b/i.test(normalized) ||
+      /\b(sydney|melbourne|brisbane|perth|adelaide|canberra|hobart|darwin)\b/i.test(normalized)
+    ) {
+      return "AU";
+    }
+
+    if (
+      /,\s*(new zealand)\s*$/i.test(raw) ||
+      /\b(new zealand|aotearoa)\b/i.test(normalized) ||
+      /\b(auckland|wellington|christchurch|hamilton|tauranga)\b/i.test(normalized)
+    ) {
+      return "NZ";
+    }
+
+    if (/\b(usa|u\.s\.a\.|united states|u\.s\.)\b/i.test(normalized) || /,\s*(usa|united states)\s*$/i.test(raw)) {
+      return "US";
+    }
+  }
+
+  const fromCoords = regionFromCoordinates(latitude, longitude);
+  if (fromCoords) return fromCoords;
+
+  return "US";
+}
+
+export function getCurrencyRates(settings?: Partial<SettingsRow> | null): CurrencyRates {
+  return {
+    gbp: Number(settings?.currency_rate_gbp ?? DEFAULT_CURRENCY_RATES.gbp),
+    aud: Number(settings?.currency_rate_aud ?? DEFAULT_CURRENCY_RATES.aud),
+    nzd: Number(settings?.currency_rate_nzd ?? DEFAULT_CURRENCY_RATES.nzd),
+  };
+}
+
+function usdToLocal(usd: number, region: CurrencyRegion, rates: CurrencyRates): number {
+  const amount = Number(usd);
+  if (!Number.isFinite(amount)) return 0;
+  switch (region) {
+    case "GB":
+      return amount * rates.gbp;
+    case "AU":
+      return amount * rates.aud;
+    case "NZ":
+      return amount * rates.nzd;
+    default:
+      return amount;
+  }
+}
+
+export type CurrencyDisplay = {
+  region: CurrencyRegion;
+  code: string;
+  label: string;
+  formatRange: (lowUsd: number | string, highUsd: number | string) => string;
+};
+
+export function getCurrencyDisplay(
+  address?: string | null,
+  settings?: Partial<SettingsRow> | null,
+  countryCode?: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
+): CurrencyDisplay {
+  const region = detectCurrencyRegion(address, countryCode, latitude, longitude);
+  const rates = getCurrencyRates(settings);
+  const meta = REGION_META[region];
+
+  return {
+    region,
+    code: meta.code,
+    label: meta.label,
+    formatRange: (lowUsd, highUsd) =>
+      meta.formatRange(usdToLocal(lowUsd, region, rates), usdToLocal(highUsd, region, rates)),
+  };
+}
+
+export function formatDeposit(
+  usdDeposit: number,
+  address?: string | null,
+  settings?: Partial<SettingsRow> | null,
+  countryCode?: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
+) {
+  const region = detectCurrencyRegion(address, countryCode, latitude, longitude);
+  const rates = getCurrencyRates(settings);
+  const local = usdToLocal(usdDeposit, region, rates);
+
+  switch (region) {
+    case "GB":
+      return `£${fmt(local)} GBP`;
+    case "AU":
+      return `AUD $${fmt(local)}`;
+    case "NZ":
+      return `NZD $${fmt(local)}`;
+    default:
+      return `$${fmt(local)} USD`;
+  }
+}

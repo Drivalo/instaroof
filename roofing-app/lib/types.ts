@@ -29,6 +29,9 @@ export interface SettingsRow {
   material_multiplier_metal: number;
   material_multiplier_tile: number;
   deposit_amount: number;
+  currency_rate_gbp: number;
+  currency_rate_aud: number;
+  currency_rate_nzd: number;
   service_area_zip_codes: string[];
   stripe_publishable_key: string | null;
   stripe_secret_key: string | null;

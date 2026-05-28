@@ -274,6 +274,37 @@ export default function AdminPage() {
           <input className="w-full border rounded p-2" defaultValue={data.settings.company_phone} onBlur={(e) => saveSettings({ company_phone: e.target.value })} />
           <input className="w-full border rounded p-2" defaultValue={data.settings.company_email} onBlur={(e) => saveSettings({ company_email: e.target.value })} />
           <input className="w-full border rounded p-2" defaultValue={data.settings.primary_color} onBlur={(e) => saveSettings({ primary_color: e.target.value })} />
+
+          <h3 className="font-semibold mt-4">Currency conversion rates (USD base)</h3>
+          <p className="text-sm text-zinc-600">
+            Quote page detects country from the customer address and converts USD estimates. Example: GBP 0.79 means
+            $10,000 → £7,900.
+          </p>
+          <label className="block text-sm font-medium">GBP rate</label>
+          <input
+            type="number"
+            step="0.01"
+            className="w-full border rounded p-2"
+            defaultValue={data.settings.currency_rate_gbp ?? 0.79}
+            onBlur={(e) => saveSettings({ currency_rate_gbp: Number(e.target.value) })}
+          />
+          <label className="block text-sm font-medium">AUD rate</label>
+          <input
+            type="number"
+            step="0.01"
+            className="w-full border rounded p-2"
+            defaultValue={data.settings.currency_rate_aud ?? 1.53}
+            onBlur={(e) => saveSettings({ currency_rate_aud: Number(e.target.value) })}
+          />
+          <label className="block text-sm font-medium">NZD rate</label>
+          <input
+            type="number"
+            step="0.01"
+            className="w-full border rounded p-2"
+            defaultValue={data.settings.currency_rate_nzd ?? 1.64}
+            onBlur={(e) => saveSettings({ currency_rate_nzd: Number(e.target.value) })}
+          />
+
           <h3 className="font-semibold mt-4">Integrations</h3>
           <input className="w-full border rounded p-2" placeholder="Stripe publishable key" onBlur={(e) => saveSettings({ stripe_publishable_key: e.target.value })} />
           <input className="w-full border rounded p-2" placeholder="Stripe secret key" onBlur={(e) => saveSettings({ stripe_secret_key: e.target.value })} />

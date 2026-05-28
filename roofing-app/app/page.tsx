@@ -15,6 +15,8 @@ type BootstrapData = {
     primary_color: string;
     secondary_color: string;
     google_maps_api_key: string | null;
+    currency_rate_aud?: number;
+    currency_rate_nzd?: number;
   };
   testimonials: Array<{ id: number; name: string; location: string; quote_text: string; rating: number }>;
 };
@@ -48,6 +50,27 @@ export default function Home() {
     [bootstrap],
   );
 
+  const previewAddress = placeDetails?.address ?? address;
+
+  const previewPriceRange = useMemo(() => {
+    const lowUsd = 8000;
+    const highUsd = 12000;
+    const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+
+    if (previewAddress.includes("UK")) {
+      return `£${fmt(lowUsd * 0.79)}-£${fmt(highUsd * 0.79)}`;
+    }
+    if (previewAddress.includes("Australia")) {
+      const rateAud = Number(bootstrap?.settings?.currency_rate_aud ?? 1.53);
+      return `A$${fmt(lowUsd * rateAud)}-A$${fmt(highUsd * rateAud)}`;
+    }
+    if (previewAddress.includes("New Zealand")) {
+      const rateNzd = Number(bootstrap?.settings?.currency_rate_nzd ?? 1.64);
+      return `NZ$${fmt(lowUsd * rateNzd)}-NZ$${fmt(highUsd * rateNzd)}`;
+    }
+    return `$${fmt(lowUsd)}-$${fmt(highUsd)}`;
+  }, [previewAddress, bootstrap?.settings]);
+
   async function createLead() {
     if (!address) return;
     setMockQuoteVisible(true);
@@ -61,32 +84,69 @@ export default function Home() {
     }
     setLoadingAnalysis(true);
     const params = new URLSearchParams(window.location.search);
+    const payload = {
+      address: placeDetails.address,
+      latitude: placeDetails.latitude,
+      longitude: placeDetails.longitude,
+      zip_code: placeDetails.zipCode,
+      country_code: placeDetails.countryCode,
+      email: email || null,
+      utm_source: params.get("utm_source"),
+      utm_medium: params.get("utm_medium"),
+      utm_campaign: params.get("utm_campaign"),
+    };
+
+    const maxAttempts = 2;
+    const retryDelayMs = 1000;
+
     try {
-      const res = await fetch("/api/leads/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: placeDetails.address,
-          latitude: placeDetails.latitude,
-          longitude: placeDetails.longitude,
-          zip_code: placeDetails.zipCode,
-          email: email || null,
-          utm_source: params.get("utm_source"),
-          utm_medium: params.get("utm_medium"),
-          utm_campaign: params.get("utm_campaign"),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to analyze roof");
-      if (data.waitlist) {
-        alert("We don't service your area yet — you've been added to the waitlist.");
-        return;
+      let lastData: {
+        error?: string;
+        userMessage?: string;
+        supabase?: unknown;
+        waitlist?: boolean;
+        lead?: { id: number };
+      } | null = null;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const res = await fetch("/api/leads/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        lastData = data;
+
+        if (res.ok) {
+          if (data.waitlist) {
+            alert("We don't service your area yet — you've been added to the waitlist.");
+            return;
+          }
+          router.push(
+            `/analyzing?leadId=${data.lead.id}&lat=${placeDetails.latitude}&lng=${placeDetails.longitude}`,
+          );
+          return;
+        }
+
+        console.error(`[createRealLead] attempt ${attempt}/${maxAttempts} failed:`, {
+          status: res.status,
+          error: data.error,
+          supabase: data.supabase,
+          userMessage: data.userMessage,
+        });
+
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
       }
-      router.push(
-        `/analyzing?leadId=${data.lead.id}&lat=${placeDetails.latitude}&lng=${placeDetails.longitude}`,
-      );
+
+      const message =
+        lastData?.userMessage ||
+        "We couldn't start your quote right now. Please wait a moment and try again.";
+      alert(message);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Analysis failed");
+      console.error("[createRealLead] network or unexpected error:", err);
+      alert("We couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoadingAnalysis(false);
     }
@@ -155,7 +215,7 @@ export default function Home() {
                 Estimated roof size: <strong>120m²</strong>
               </p>
               <p className="rounded-lg bg-zinc-100 p-3">
-                Price range: <strong>$8,000-$12,000</strong>
+                Price range: <strong>{previewPriceRange}</strong>
               </p>
               <p className="rounded-lg bg-zinc-100 p-3">
                 Recommended material: <strong>Colorbond steel</strong>
