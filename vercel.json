@@ -1,5 +1,6 @@
 {
-  "installCommand": "npm install --prefix roofing-app",
-  "buildCommand": "npm run build --prefix roofing-app",
-  "outputDirectory": "roofing-app/.next"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd roofing-app && npm install",
+  "buildCommand": "cd roofing-app && npm run build",
+  "framework": "nextjs"
 }
