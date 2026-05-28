@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install --prefix roofing-app",
+  "buildCommand": "npm run build --prefix roofing-app",
+  "outputDirectory": "roofing-app/.next"
+}
