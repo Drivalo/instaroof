@@ -3,8 +3,22 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SettingsRow } from "@/lib/types";
+
+const contactFieldClass =
+  "w-full rounded-lg border border-border-subtle bg-surface px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
+
+function isValidEmail(value: string) {
+  const trimmed = value.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
+function isValidPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+}
 
 type QuoteCurrency = "GB" | "AU" | "NZ" | "US";
 
@@ -106,9 +120,12 @@ function formatDepositPrice(
 }
 
 export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
   const [settings, setSettings] = useState<SettingsRow | null>(null);
+  const [contact, setContact] = useState({ name: "", email: "", phone: "" });
+  const [savingContact, setSavingContact] = useState(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -144,10 +161,59 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     [customerAddress, customerCountry],
   );
 
-  if (!lead) return <main className="container-max py-10">Loading quote...</main>;
+  useEffect(() => {
+    if (!lead) return;
+    setContact({
+      name: String(lead.name ?? ""),
+      email: String(lead.email ?? ""),
+      phone: String(lead.phone ?? ""),
+    });
+  }, [lead]);
+
+  const contactReady =
+    contact.name.trim().length > 0 && isValidEmail(contact.email) && isValidPhone(contact.phone);
+
+  async function continueToBooking() {
+    const name = contact.name.trim();
+    const email = contact.email.trim();
+    const phone = contact.phone.trim();
+
+    if (!name) {
+      alert("Please enter your name.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      alert("Please enter a valid phone number.");
+      return;
+    }
+
+    setSavingContact(true);
+    try {
+      const res = await fetch(`/api/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not save your details");
+      }
+      router.push(`/book/${id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not save your details. Please try again.");
+    } finally {
+      setSavingContact(false);
+    }
+  }
+
+  if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
 
   return (
-    <main className="container-max py-8">
+    <main className="customer-page container-max py-8">
       <div className="relative w-full max-w-[600px]">
         <Image
           src={lead.satellite_image_url}
@@ -199,8 +265,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       <div className="grid md:grid-cols-3 gap-4 mt-6">
         <div className="rounded-xl border bg-white p-4">
-          <h3 className="font-semibold">Repair Estimate</h3>
-          <p className="text-2xl font-bold mt-2">
+          <h3>Repair Estimate</h3>
+          <p className="text-2xl mt-2">
             {(() => {
               const low = Number(lead.quote_repair_low) || 0;
               const high = Number(lead.quote_repair_high) || 0;
@@ -213,8 +279,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           </p>
         </div>
         <div className="rounded-xl border bg-white p-4">
-          <h3 className="font-semibold">Full Replacement - Standard</h3>
-          <p className="text-2xl font-bold mt-2">
+          <h3>Full Replacement - Standard</h3>
+          <p className="text-2xl mt-2">
             {(() => {
               const low = Number(lead.quote_standard_low) || 0;
               const high = Number(lead.quote_standard_high) || 0;
@@ -227,8 +293,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           </p>
         </div>
         <div className="rounded-xl border bg-white p-4">
-          <h3 className="font-semibold">Full Replacement - Premium</h3>
-          <p className="text-2xl font-bold mt-2">
+          <h3>Full Replacement - Premium</h3>
+          <p className="text-2xl mt-2">
             {(() => {
               const low = Number(lead.quote_premium_low) || 0;
               const high = Number(lead.quote_premium_high) || 0;
@@ -255,18 +321,75 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </Link>
       )}
 
-      <Link href={`/book/${id}`} className="inline-block mt-6 rounded-xl bg-[#C8102E] px-6 py-4 text-white font-semibold">
-        Lock In Your Quote - Book Free Inspection (
-        {(() => {
-          const usd = Number(settings?.deposit_amount ?? 50);
-          const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-          if (customerAddress.endsWith("UK") || customerAddress.includes(", UK")) {
-            return `£${fmt(usd * 0.79)}`;
-          }
-          return `$${fmt(usd)}`;
-        })()}{" "}
-        Refundable Deposit)
-      </Link>
+      <section className="mt-8 max-w-md rounded-lg border border-border-subtle bg-surface p-6">
+        <h2 className="text-lg text-foreground">Your details</h2>
+        <p className="mt-1 text-sm text-muted">We&apos;ll use these to confirm your inspection booking.</p>
+        <div className="mt-5 space-y-4">
+          <div>
+            <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
+              Name
+            </label>
+            <input
+              id="quote-name"
+              type="text"
+              required
+              autoComplete="name"
+              className={contactFieldClass}
+              placeholder="Your full name"
+              value={contact.name}
+              onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label htmlFor="quote-email" className="block text-sm text-muted mb-1.5">
+              Email
+            </label>
+            <input
+              id="quote-email"
+              type="email"
+              required
+              autoComplete="email"
+              className={contactFieldClass}
+              placeholder="your@email.com"
+              value={contact.email}
+              onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label htmlFor="quote-phone" className="block text-sm text-muted mb-1.5">
+              Phone number
+            </label>
+            <input
+              id="quote-phone"
+              type="tel"
+              required
+              autoComplete="tel"
+              className={contactFieldClass}
+              placeholder="Phone number"
+              value={contact.phone}
+              onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+            />
+          </div>
+        </div>
+      </section>
+
+      <button
+        type="button"
+        onClick={continueToBooking}
+        disabled={!contactReady || savingContact}
+        className="mt-6 rounded-xl bg-[#C8102E] px-6 py-4 text-white disabled:opacity-50"
+      >
+        {savingContact
+          ? "Saving…"
+          : `Lock In Your Quote - Book Free Inspection (${(() => {
+              const usd = Number(settings?.deposit_amount ?? 50);
+              const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+              if (customerAddress.endsWith("UK") || customerAddress.includes(", UK")) {
+                return `£${fmt(usd * 0.79)}`;
+              }
+              return `$${fmt(usd)}`;
+            })()} Refundable Deposit)`}
+      </button>
     </main>
   );
 }

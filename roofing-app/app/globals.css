@@ -31,6 +31,16 @@ body {
   font-weight: 400;
 }
 
+/* Customer flow pages (all routes except landing hero) */
+.customer-page {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-weight: 400;
+}
+
+.customer-page :is(h1, h2, h3, h4, h5, h6, p, label, button, a, li, input, select, textarea) {
+  font-weight: 400;
+}
+
 .font-heading {
   font-family: var(--font-dm-sans), system-ui, sans-serif;
   font-weight: 400;

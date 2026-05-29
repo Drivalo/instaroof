@@ -114,6 +114,27 @@ export function detectCurrencyRegion(
   return "US";
 }
 
+/** UK, Australia, and New Zealand use British English spelling in customer UI. */
+export function usesBritishSpelling(region: CurrencyRegion): boolean {
+  return region === "GB" || region === "AU" || region === "NZ";
+}
+
+export function analyzingHeadline(region: CurrencyRegion): string {
+  return usesBritishSpelling(region) ? "Analysing your roof..." : "Analyzing your roof...";
+}
+
+export function analyzingProgressSteps(region: CurrencyRegion): string[] {
+  const verb = usesBritishSpelling(region) ? "Analysing" : "Analyzing";
+  return [
+    "Locating property...",
+    "Capturing satellite imagery...",
+    `${verb} roof outline...`,
+    "Measuring square footage...",
+    "Detecting roof material...",
+    "Calculating quote...",
+  ];
+}
+
 export function getCurrencyRates(settings?: Partial<SettingsRow> | null): CurrencyRates {
   return {
     gbp: Number(settings?.currency_rate_gbp ?? DEFAULT_CURRENCY_RATES.gbp),

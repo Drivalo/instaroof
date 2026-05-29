@@ -10,7 +10,6 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
   const [settings, setSettings] = useState<any>(null);
   const [availability, setAvailability] = useState<any[]>([]);
   const [slot, setSlot] = useState("");
-  const [form, setForm] = useState({ name: "", phone: "", email: "", bestTimeToContact: "" });
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -46,46 +45,75 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
     return values;
   }, [availability]);
 
+  const contactComplete = Boolean(
+    lead?.name?.trim() && lead?.email?.trim() && lead?.phone?.trim(),
+  );
+
   async function checkout() {
+    if (!contactComplete) {
+      alert("Please complete your name, email, and phone on the quote page first.");
+      return;
+    }
     window.fbq?.("track", "InitiateCheckout");
     window.gtag?.("event", "begin_checkout");
     const res = await fetch("/api/bookings/create-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: id, ...form, inspectionDateTime: slot }),
+      body: JSON.stringify({
+        leadId: id,
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email,
+        bestTimeToContact: null,
+        inspectionDateTime: slot,
+      }),
     });
     const data = await res.json();
     if (data.url) window.location.href = data.url;
   }
 
-  if (!lead) return <main className="container-max py-8">Loading booking...</main>;
+  if (!lead) return <main className="customer-page container-max py-8">Loading booking...</main>;
 
   return (
-    <main className="container-max py-8 grid md:grid-cols-2 gap-6">
-      <section className="rounded-xl bg-white border p-4">
-        <h2 className="text-xl font-semibold mb-3">Pick your inspection slot</h2>
+    <main className="customer-page container-max py-8 grid md:grid-cols-2 gap-6">
+      <section className="rounded-xl bg-white border p-4 text-zinc-900">
+        <h2 className="text-xl mb-3">Pick your inspection slot</h2>
         <div className="grid gap-2 max-h-[460px] overflow-auto">
           {next14DaysSlots.map((s) => (
             <button
               key={s}
               onClick={() => setSlot(s)}
-              className={`text-left rounded-lg border p-3 ${slot === s ? "bg-[#C8102E] text-white" : "bg-white"}`}
+              className={`text-left rounded-lg border p-3 ${slot === s ? "bg-[#C8102E] text-white" : "bg-white text-zinc-900"}`}
             >
               {format(new Date(s), "EEE, MMM d - h:mm a")}
             </button>
           ))}
         </div>
       </section>
-      <section className="rounded-xl bg-white border p-4">
-        <h2 className="text-xl font-semibold mb-3">Deposit checkout</h2>
-        <div className="space-y-2">
-          <input className="w-full border rounded-lg p-3" placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input className="w-full border rounded-lg p-3" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <input className="w-full border rounded-lg p-3" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input className="w-full border rounded-lg p-3" placeholder="Best time to contact" value={form.bestTimeToContact} onChange={(e) => setForm({ ...form, bestTimeToContact: e.target.value })} />
+      <section className="rounded-xl bg-white border p-4 text-zinc-900">
+        <h2 className="text-xl mb-3">Deposit checkout</h2>
+        <div className="space-y-2 text-sm text-zinc-700">
+          <p>
+            <span className="text-zinc-500">Name:</span> {lead.name || "—"}
+          </p>
+          <p>
+            <span className="text-zinc-500">Email:</span> {lead.email || "—"}
+          </p>
+          <p>
+            <span className="text-zinc-500">Phone:</span> {lead.phone || "—"}
+          </p>
         </div>
+        {!contactComplete && (
+          <p className="mt-3 text-sm text-amber-800">
+            Go back to your quote page to enter your contact details before checkout.
+          </p>
+        )}
         <p className="mt-3 text-sm text-zinc-600">Deposit due today: ${settings?.deposit_amount ?? 50}</p>
-        <button onClick={checkout} disabled={!slot || !form.name || !form.email} className="mt-4 w-full rounded-xl bg-[#C8102E] p-3 text-white font-semibold">
+        <button
+          onClick={checkout}
+          disabled={!slot || !contactComplete}
+          className="mt-4 w-full rounded-xl bg-[#C8102E] p-3 text-white disabled:opacity-50"
+        >
           Continue to Stripe Checkout
         </button>
       </section>

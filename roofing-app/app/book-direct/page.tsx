@@ -50,20 +50,20 @@ function BookDirectContent() {
   }
 
   return (
-    <main className="min-h-[70vh] bg-zinc-50 py-14">
+    <main className="customer-page min-h-[70vh] bg-zinc-50 py-14">
       <section className="container-max">
         <div className="mx-auto max-w-2xl rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-          <h1 className="text-3xl font-bold text-zinc-900">Book Your Inspection</h1>
+          <h1 className="text-3xl text-zinc-900">Book Your Inspection</h1>
           <p className="mt-2 text-zinc-600">$50 fully-refundable deposit to secure your slot.</p>
 
           <div className="mt-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Property Address</label>
+              <label className="block text-sm text-zinc-700">Property Address</label>
               <p className="mt-1 rounded-lg bg-zinc-100 p-3 text-zinc-800">{addressFromQuery}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Your Name</label>
+              <label className="block text-sm text-zinc-700">Your Name</label>
               <input
                 className="mt-1 w-full rounded-lg border border-zinc-300 p-3"
                 placeholder="Full name"
@@ -73,7 +73,7 @@ function BookDirectContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Email</label>
+              <label className="block text-sm text-zinc-700">Email</label>
               <input
                 className="mt-1 w-full rounded-lg border border-zinc-300 p-3"
                 placeholder="your@email.com"
@@ -84,7 +84,7 @@ function BookDirectContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Preferred Inspection Date</label>
+              <label className="block text-sm text-zinc-700">Preferred Inspection Date</label>
               <input
                 className="mt-1 w-full rounded-lg border border-zinc-300 p-3"
                 type="date"
@@ -98,7 +98,7 @@ function BookDirectContent() {
             <button
               onClick={handleBooking}
               disabled={loading}
-              className="w-full rounded-xl bg-[#C8102E] px-6 py-4 font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-xl bg-[#C8102E] px-6 py-4 text-white disabled:opacity-50"
             >
               {loading ? "Redirecting to Stripe..." : "Book Inspection & Pay $50 Deposit"}
             </button>
@@ -113,10 +113,10 @@ export default function BookDirectPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-[70vh] bg-zinc-50 py-14">
+        <main className="customer-page min-h-[70vh] bg-zinc-50 py-14">
           <section className="container-max">
             <div className="mx-auto max-w-2xl rounded-2xl border bg-white p-8">
-              <h1 className="text-3xl font-bold">Book Your Inspection</h1>
+              <h1 className="text-3xl">Book Your Inspection</h1>
               <p className="mt-2 text-zinc-600">Loading...</p>
             </div>
           </section>
