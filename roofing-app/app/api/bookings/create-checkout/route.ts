@@ -35,6 +35,12 @@ export async function POST(req: NextRequest) {
       throw new Error("Inspection appointment was not saved to the lead");
     }
 
+    console.info("[bookings/create-checkout] inspection_datetime saved to Supabase", {
+      leadId,
+      inspection_datetime: updatedLead.inspection_datetime,
+      address: updatedLead.address,
+    });
+
     const successUrl = `${req.nextUrl.origin}/confirmation/${leadId}?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${req.nextUrl.origin}/book/${leadId}`;
     const session = await createStripeCheckoutSession({

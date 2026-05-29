@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format } from "date-fns";
-import { sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
+import { sendCustomerBookingConfirmedEmail } from "@/lib/customer-quote-email";
 import {
   formatInspectionSchedule,
   normalizeInspectionDatetime,
@@ -91,11 +91,26 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, appointment });
       }
 
+      if (!inspectionIsoFinal) {
+        console.error("[bookings/confirm] cannot send email — inspection_datetime missing after DB read", {
+          leadId,
+          dbValue: lead.inspection_datetime,
+          stripeMetadata: metadataInspection,
+        });
+        return NextResponse.json(
+          { error: "Appointment time was not saved. Please contact support." },
+          { status: 500 },
+        );
+      }
+
       const appBaseUrl =
         process.env.NEXT_PUBLIC_APP_URL?.trim() ||
         req.headers.get("origin")?.trim() ||
         "http://localhost:3000";
-      await sendCustomerQuoteReadyEmail(Number(leadId), appBaseUrl);
+      const emailResult = await sendCustomerBookingConfirmedEmail(Number(leadId), appBaseUrl);
+      if (!emailResult.sent) {
+        console.error("[bookings/confirm] booking confirmation email failed", emailResult);
+      }
 
       const dateText = inspectionIsoFinal
         ? format(new Date(inspectionIsoFinal), "PPP 'at' p")

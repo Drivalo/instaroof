@@ -301,9 +301,35 @@ function resolveSubject(lead: LeadRecord): string {
   return hasInspectionBooking(lead) ? SUBJECT_BOOKED : SUBJECT_QUOTE;
 }
 
-export async function sendCustomerQuoteReadyEmail(
+async function fetchLeadForEmail(leadId: number): Promise<LeadRecord | null> {
+  const supabase = getSupabaseAdmin();
+  const { data: lead, error } = await supabase
+    .from("leads")
+    .select(
+      "id, name, email, address, country_code, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid",
+    )
+    .eq("id", leadId)
+    .single();
+
+  if (error || !lead) {
+    console.error("[customer-quote-email] lead fetch failed", { leadId, error: error?.message });
+    return null;
+  }
+
+  console.info("[customer-quote-email] lead loaded from Supabase", {
+    leadId,
+    inspection_datetime: lead.inspection_datetime ?? null,
+    deposit_paid: lead.deposit_paid ?? null,
+    address: lead.address,
+  });
+
+  return lead as LeadRecord;
+}
+
+async function sendCustomerEmail(
   leadId: number,
   appBaseUrl: string,
+  options: { requireInspection: boolean },
 ): Promise<CustomerQuoteEmailResult> {
   ensureEnvLoaded();
 
@@ -313,24 +339,33 @@ export async function sendCustomerQuoteReadyEmail(
     return { sent: false, skipped: true, reason: "RESEND_API_KEY not configured" };
   }
 
-  const supabase = getSupabaseAdmin();
-  const { data: lead, error } = await supabase.from("leads").select("*").eq("id", leadId).single();
-
-  if (error || !lead) {
+  const record = await fetchLeadForEmail(leadId);
+  if (!record) {
     return { sent: false, skipped: true, reason: "Lead not found" };
   }
 
-  const to = lead.email?.trim();
+  if (options.requireInspection && !hasInspectionBooking(record)) {
+    console.error("[customer-quote-email] booking email blocked — no inspection_datetime in DB", {
+      leadId,
+      inspection_datetime: record.inspection_datetime ?? null,
+    });
+    return {
+      sent: false,
+      skipped: true,
+      reason: "Lead has no inspection_datetime in database",
+    };
+  }
+
+  const to = record.email?.trim();
   if (!to) {
     return { sent: false, skipped: true, reason: "Lead has no email" };
   }
 
   const settings = await getSettings();
-  const record = lead as LeadRecord;
   const firstName = (record.name?.trim().split(/\s+/)[0] || "there").replace(/[<>]/g, "");
   const quoteUrl = `${appBaseUrl.replace(/\/$/, "")}/quote/${leadId}`;
   const from = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
-  const subject = resolveSubject(record);
+  const subject = options.requireInspection ? SUBJECT_BOOKED : resolveSubject(record);
 
   try {
     const resend = new Resend(apiKey);
@@ -347,7 +382,13 @@ export async function sendCustomerQuoteReadyEmail(
       return { sent: false, reason: sendError.message };
     }
 
-    console.info("[customer-quote-email] sent", { leadId, to, subject, messageId: data?.id });
+    console.info("[customer-quote-email] sent", {
+      leadId,
+      to,
+      subject,
+      inspection_datetime: record.inspection_datetime ?? null,
+      messageId: data?.id,
+    });
     return { sent: true, messageId: data?.id };
   } catch (err) {
     console.error("[customer-quote-email] failed:", err);
@@ -356,4 +397,20 @@ export async function sendCustomerQuoteReadyEmail(
       reason: err instanceof Error ? err.message : "Failed to send email",
     };
   }
+}
+
+/** Quote flow — inspection may not exist yet. */
+export async function sendCustomerQuoteReadyEmail(
+  leadId: number,
+  appBaseUrl: string,
+): Promise<CustomerQuoteEmailResult> {
+  return sendCustomerEmail(leadId, appBaseUrl, { requireInspection: false });
+}
+
+/** After Stripe payment — requires inspection_datetime from DB before sending. */
+export async function sendCustomerBookingConfirmedEmail(
+  leadId: number,
+  appBaseUrl: string,
+): Promise<CustomerQuoteEmailResult> {
+  return sendCustomerEmail(leadId, appBaseUrl, { requireInspection: true });
 }
