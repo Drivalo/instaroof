@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafaf8;
-  --foreground: #1c1c1c;
-  --surface: #ffffff;
-  --muted: #4a4a4a;
-  --accent: #0f4c75;
+  --background: #1c1c1c;
+  --foreground: #ffffff;
+  --surface: #2a2a2a;
+  --muted: #a0a0a0;
+  --accent: #f5a623;
   --button-accent: #f5a623;
   --button-accent-hover: #e09520;
-  --border-subtle: #e8e8e6;
+  --button-text: #1c1c1c;
+  --border-subtle: #3a3a3a;
 }
 
 @theme inline {
@@ -43,7 +44,7 @@ body {
 
 .btn-accent {
   background-color: var(--button-accent);
-  color: var(--foreground);
+  color: var(--button-text);
   transition: background-color 0.2s ease;
 }
 
