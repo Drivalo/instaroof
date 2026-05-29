@@ -355,8 +355,14 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
+      {hasQuoteEstimates && (
+        <p className="mt-3 text-sm text-muted leading-relaxed">
+          Final price confirmed at your free inspection. Book with no obligation.
+        </p>
+      )}
+
       <p className="mt-3 text-sm text-muted">
-        Estimate based on AI satellite analysis. Final pricing confirmed at free in-person inspection.
+        Estimate based on AI satellite analysis.
       </p>
 
       {lead.latitude != null && lead.longitude != null && (
@@ -370,7 +376,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       <section className="mt-8 max-w-md rounded-lg border border-border-subtle bg-surface p-6">
         <h2 className="text-lg text-foreground">Your details</h2>
-        <p className="mt-1 text-sm text-muted">We&apos;ll use these to confirm your inspection booking.</p>
+        <p className="mt-1 text-sm text-muted">Required to save your quote and book your free inspection.</p>
         <div className="mt-5 space-y-4">
           <div>
             <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
@@ -397,7 +403,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               required
               autoComplete="email"
               className={contactFieldClass}
-              placeholder="your@email.com"
+              placeholder="Email"
               value={contact.email}
               onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
             />

@@ -27,8 +27,6 @@ export default function Home() {
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [address, setAddress] = useState("");
   const [placeDetails, setPlaceDetails] = useState<AddressPlaceDetails | null>(null);
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -72,40 +70,6 @@ export default function Home() {
     );
   }
 
-  function isValidEmail(value: string) {
-    const trimmed = value.trim();
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
-  }
-
-  function isValidPhone(value: string) {
-    const digits = value.replace(/\D/g, "");
-    return digits.length >= 7 && digits.length <= 15;
-  }
-
-  function requireContact(): { email: string; phone: string } | null {
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      alert("Please enter your email address.");
-      return null;
-    }
-    if (!isValidEmail(trimmedEmail)) {
-      alert("Please enter a valid email address.");
-      return null;
-    }
-
-    const trimmedPhone = phone.trim();
-    if (!trimmedPhone) {
-      alert("Please enter your phone number.");
-      return null;
-    }
-    if (!isValidPhone(trimmedPhone)) {
-      alert("Please enter a valid phone number.");
-      return null;
-    }
-
-    return { email: trimmedEmail, phone: trimmedPhone };
-  }
-
   async function createLead() {
     const inputValue = addressInputRef.current?.getValue() ?? "";
     const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
@@ -114,8 +78,6 @@ export default function Home() {
       alert("Please enter your property address.");
       return;
     }
-
-    if (!requireContact()) return;
 
     if (resolvedAddress !== address) {
       setAddress(resolvedAddress);
@@ -168,9 +130,6 @@ export default function Home() {
       return;
     }
 
-    const contact = requireContact();
-    if (!contact) return;
-
     setLoadingAnalysis(true);
     const params = new URLSearchParams(window.location.search);
     const payload = {
@@ -179,8 +138,8 @@ export default function Home() {
       longitude: details.longitude,
       zip_code: details.zipCode,
       country_code: details.countryCode,
-      email: contact.email,
-      phone: contact.phone,
+      email: null,
+      phone: null,
       utm_source: params.get("utm_source"),
       utm_medium: params.get("utm_medium"),
       utm_campaign: params.get("utm_campaign"),
@@ -252,9 +211,6 @@ export default function Home() {
   );
 
   const testimonials = bootstrap?.testimonials?.length ? bootstrap.testimonials : defaultTestimonials;
-  const contactFieldClass =
-    "w-full sm:max-w-md rounded-lg border border-border-subtle bg-surface px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
-  const formReady = isValidEmail(email) && isValidPhone(phone);
 
   return (
     <main className="min-h-screen bg-background text-foreground font-sans font-normal pb-24">
@@ -294,7 +250,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={createLead}
-                disabled={loadingPreview || !formReady}
+                disabled={loadingPreview}
                 className="relative z-10 btn-accent shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide"
               >
                 {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
@@ -307,23 +263,6 @@ export default function Home() {
               </p>
             )}
 
-            <input
-              type="email"
-              required
-              className={`mt-4 ${contactFieldClass}`}
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              type="tel"
-              required
-              autoComplete="tel"
-              className={`mt-3 ${contactFieldClass}`}
-              placeholder="Phone number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
           </div>
         </div>
       </section>
@@ -366,7 +305,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={createRealLead}
-                disabled={loadingAnalysis || loadingPreview || !previewRoofLabel || !formReady}
+                disabled={loadingAnalysis || loadingPreview || !previewRoofLabel}
                 className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm tracking-wide disabled:opacity-50"
               >
                 {loadingAnalysis ? "Starting analysis…" : "Continue with full AI analysis"}
