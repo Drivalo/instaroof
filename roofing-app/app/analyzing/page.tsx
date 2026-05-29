@@ -245,7 +245,9 @@ function AnalyzingContent() {
               <li
                 key={step}
                 className={`rounded-lg p-3 ${
-                  i <= index ? "bg-green-100 text-green-800" : "bg-surface text-muted border border-border-subtle"
+                  i <= index
+                    ? "bg-[#C9A96E] text-[#1C1C1C]"
+                    : "bg-surface text-muted border border-border-subtle"
                 }`}
               >
                 {i <= index ? "✓ " : ""}

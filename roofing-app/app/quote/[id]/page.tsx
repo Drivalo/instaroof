@@ -254,8 +254,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           <svg viewBox="0 0 600 600" className="absolute inset-0 w-full h-full pointer-events-none">
             <polygon
               points={polygonPoints}
-              fill="rgba(245, 166, 35, 0.35)"
-              stroke="rgba(245, 166, 35, 0.9)"
+              fill="rgba(201, 169, 110, 0.35)"
+              stroke="#C9A96E"
               strokeWidth="3"
             />
           </svg>
