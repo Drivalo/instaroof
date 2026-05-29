@@ -1,8 +1,14 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
+import { formatDeposit } from "@/lib/currency";
+
+const slotButtonBase =
+  "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
+const slotButtonSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
 
 export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
@@ -49,6 +55,20 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
     lead?.name?.trim() && lead?.email?.trim() && lead?.phone?.trim(),
   );
 
+  const depositLabel = useMemo(() => {
+    if (!settings) return "—";
+    const usd = Number(settings.deposit_amount ?? 50);
+    if (!lead) return `$${usd}`;
+    return formatDeposit(
+      usd,
+      lead.address,
+      settings,
+      lead.country_code,
+      lead.latitude,
+      lead.longitude,
+    );
+  }, [lead, settings]);
+
   async function checkout() {
     if (!contactComplete) {
       alert("Please complete your name, email, and phone on the quote page first.");
@@ -72,51 +92,87 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
     if (data.url) window.location.href = data.url;
   }
 
-  if (!lead) return <main className="customer-page container-max py-8">Loading booking...</main>;
+  if (!lead) {
+    return (
+      <main className="customer-page min-h-screen bg-background text-foreground">
+        <div className="container-max py-10">
+          <p className="text-muted">Loading booking…</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="customer-page container-max py-8 grid md:grid-cols-2 gap-6">
-      <section className="rounded-xl bg-white border p-4 text-zinc-900">
-        <h2 className="text-xl mb-3">Pick your inspection slot</h2>
-        <div className="grid gap-2 max-h-[460px] overflow-auto">
-          {next14DaysSlots.map((s) => (
+    <main className="customer-page min-h-screen bg-background text-foreground pb-16">
+      <div className="container-max py-8 md:py-12">
+        <h1 className="text-2xl md:text-3xl">Book your free inspection</h1>
+        <p className="mt-2 text-muted max-w-xl">
+          Choose a time slot and pay your refundable deposit to lock in your quote.
+        </p>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <section className="rounded-lg border border-border-subtle bg-surface p-6 md:p-8">
+            <h2 className="text-lg text-foreground">Pick your inspection slot</h2>
+            <div className="mt-4 grid gap-2 max-h-[460px] overflow-auto pr-1">
+              {next14DaysSlots.length === 0 ? (
+                <p className="text-sm text-muted">No slots available in the next 14 days.</p>
+              ) : (
+                next14DaysSlots.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSlot(s)}
+                    className={slot === s ? slotButtonSelected : slotButtonBase}
+                  >
+                    {format(new Date(s), "EEE, MMM d — h:mm a")}
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border-subtle bg-surface p-6 md:p-8 flex flex-col">
+            <h2 className="text-lg text-foreground">Deposit checkout</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <p className="text-foreground">
+                <span className="text-muted">Name: </span>
+                {lead.name || "—"}
+              </p>
+              <p className="text-foreground">
+                <span className="text-muted">Email: </span>
+                {lead.email || "—"}
+              </p>
+              <p className="text-foreground">
+                <span className="text-muted">Phone: </span>
+                {lead.phone || "—"}
+              </p>
+            </div>
+
+            {!contactComplete && (
+              <p className="mt-4 text-sm text-amber-200/90 leading-relaxed">
+                Go back to your{" "}
+                <Link href={`/quote/${id}`} className="text-accent underline">
+                  quote page
+                </Link>{" "}
+                to enter your contact details before checkout.
+              </p>
+            )}
+
+            <p className="mt-4 text-sm text-muted">
+              Refundable deposit due today: <span className="text-foreground">{depositLabel}</span>
+            </p>
+
             <button
-              key={s}
-              onClick={() => setSlot(s)}
-              className={`text-left rounded-lg border p-3 ${slot === s ? "bg-[#C8102E] text-white" : "bg-white text-zinc-900"}`}
+              type="button"
+              onClick={checkout}
+              disabled={!slot || !contactComplete}
+              className="mt-6 w-full btn-accent rounded-lg px-6 py-3.5 text-sm tracking-wide disabled:opacity-50"
             >
-              {format(new Date(s), "EEE, MMM d - h:mm a")}
+              Continue to Stripe Checkout
             </button>
-          ))}
+          </section>
         </div>
-      </section>
-      <section className="rounded-xl bg-white border p-4 text-zinc-900">
-        <h2 className="text-xl mb-3">Deposit checkout</h2>
-        <div className="space-y-2 text-sm text-zinc-700">
-          <p>
-            <span className="text-zinc-500">Name:</span> {lead.name || "—"}
-          </p>
-          <p>
-            <span className="text-zinc-500">Email:</span> {lead.email || "—"}
-          </p>
-          <p>
-            <span className="text-zinc-500">Phone:</span> {lead.phone || "—"}
-          </p>
-        </div>
-        {!contactComplete && (
-          <p className="mt-3 text-sm text-amber-800">
-            Go back to your quote page to enter your contact details before checkout.
-          </p>
-        )}
-        <p className="mt-3 text-sm text-zinc-600">Deposit due today: ${settings?.deposit_amount ?? 50}</p>
-        <button
-          onClick={checkout}
-          disabled={!slot || !contactComplete}
-          className="mt-4 w-full rounded-xl bg-[#C8102E] p-3 text-white disabled:opacity-50"
-        >
-          Continue to Stripe Checkout
-        </button>
-      </section>
+      </div>
     </main>
   );
 }
