@@ -28,14 +28,6 @@ export async function POST(req: NextRequest) {
       ? normalizeInspectionDatetime(metadataInspection)
       : null;
 
-    let lead: {
-      email: string;
-      phone: string;
-      name: string;
-      address: string;
-      inspection_datetime: string | null;
-    } | null = null;
-
     if (isSupabaseConfigured()) {
       const supabase = getSupabaseAdmin();
 
@@ -67,7 +59,8 @@ export async function POST(req: NextRequest) {
         .select("*")
         .single();
       if (leadError || !data) throw leadError || new Error("Lead update failed");
-      lead = data;
+
+      let lead = data;
 
       if (!lead.inspection_datetime && inspectionIso) {
         const { data: repaired, error: repairError } = await supabase
