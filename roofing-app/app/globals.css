@@ -1,13 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8f6f2;
+  --background: #fafaf8;
   --foreground: #1c1c1c;
   --surface: #ffffff;
-  --muted: #6b6b6b;
-  --accent: #c9a96e;
-  --accent-hover: #b89456;
-  --border-subtle: #e8e4dc;
+  --muted: #4a4a4a;
+  --accent: #0f4c75;
+  --button-accent: #f5a623;
+  --button-accent-hover: #e09520;
+  --border-subtle: #e8e8e6;
 }
 
 @theme inline {
@@ -16,20 +17,22 @@
   --color-surface: var(--surface);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
+  --color-button-accent: var(--button-accent);
+  --color-button-accent-hover: var(--button-accent-hover);
   --color-border-subtle: var(--border-subtle);
-  --font-sans: var(--font-inter), system-ui, sans-serif;
-  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-weight: 400;
 }
 
-.font-serif {
-  font-family: var(--font-playfair), Georgia, serif;
+.font-heading {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-weight: 500;
 }
 
 .container-max {
@@ -39,13 +42,13 @@ body {
 }
 
 .btn-accent {
-  background-color: var(--accent);
-  color: #ffffff;
+  background-color: var(--button-accent);
+  color: var(--foreground);
   transition: background-color 0.2s ease;
 }
 
 .btn-accent:hover:not(:disabled) {
-  background-color: var(--accent-hover);
+  background-color: var(--button-accent-hover);
 }
 
 .btn-accent:disabled {
@@ -59,7 +62,7 @@ body {
   border: 1px solid var(--border-subtle);
   box-shadow: none;
   margin-top: 4px;
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
   background: var(--surface);
 }
 

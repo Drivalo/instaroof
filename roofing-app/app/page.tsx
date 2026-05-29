@@ -212,7 +212,7 @@ export default function Home() {
   const testimonials = bootstrap?.testimonials?.length ? bootstrap.testimonials : defaultTestimonials;
 
   return (
-    <main className="min-h-screen bg-[#F8F6F2] text-[#1C1C1C] pb-24">
+    <main className="min-h-screen bg-background text-foreground pb-24">
       {/* Hero */}
       <section className="pt-14 md:pt-20 pb-16 md:pb-24">
         <div className="container-max">
@@ -227,10 +227,10 @@ export default function Home() {
             />
           ) : null}
 
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-[3.25rem] leading-[1.15] tracking-tight max-w-2xl">
+          <h1 className="font-heading text-4xl md:text-5xl lg:text-[3.25rem] leading-[1.15] tracking-tight max-w-2xl">
             Get your roof quote in 60 seconds
           </h1>
-          <p className="mt-5 text-lg md:text-xl text-[#6B6B6B] max-w-xl leading-relaxed">
+          <p className="mt-5 text-lg md:text-xl text-muted max-w-xl leading-relaxed">
             See your price. Decide when you&apos;re ready.
           </p>
 
@@ -238,7 +238,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-3">
               <AddressAutocomplete
                 ref={addressInputRef}
-                className="flex-1 w-full rounded-lg border border-[#E8E4DC] bg-white px-4 py-3.5 text-[#1C1C1C] placeholder:text-[#6B6B6B]/70 focus:outline-none focus:border-[#C9A96E] transition-colors"
+                className="flex-1 w-full rounded-lg border border-border-subtle bg-surface px-4 py-3.5 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors"
                 placeholder="Enter your property address"
                 onAddressChange={(value) => {
                   setAddress(value);
@@ -257,13 +257,13 @@ export default function Home() {
             </div>
 
             {!hasGoogleMapsKey() && (
-              <p className="mt-3 text-sm text-[#6B6B6B]">
+              <p className="mt-3 text-sm text-muted">
                 Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to roofing-app/.env.local and restart the dev server.
               </p>
             )}
 
             <input
-              className="mt-4 w-full sm:max-w-md rounded-lg border border-[#E8E4DC] bg-white px-4 py-3 text-[#1C1C1C] placeholder:text-[#6B6B6B]/70 focus:outline-none focus:border-[#C9A96E] transition-colors"
+              className="mt-4 w-full sm:max-w-md rounded-lg border border-border-subtle bg-surface px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors"
               placeholder="Email (optional)"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -276,33 +276,33 @@ export default function Home() {
       {mockQuoteVisible && (
         <section ref={previewSectionRef} className="pb-16 md:pb-20">
           <div className="container-max">
-            <div className="rounded-lg border border-[#E8E4DC] bg-white p-8 md:p-10">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#C9A96E] font-medium">Your estimate</p>
-              <h2 className="font-serif text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
+            <div className="rounded-lg border border-border-subtle bg-surface p-8 md:p-10">
+              <p className="text-xs uppercase tracking-[0.2em] text-accent font-medium">Your estimate</p>
+              <h2 className="font-heading text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
 
               <div className="mt-8 grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg border border-[#E8E4DC] bg-[#F8F6F2] px-5 py-4">
-                  <p className="text-sm text-[#6B6B6B]">Estimated roof size</p>
-                  <p className="mt-1 text-lg font-medium text-[#1C1C1C]">
+                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
+                  <p className="text-sm text-muted">Estimated roof size</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">
                     {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
                   </p>
                 </div>
-                <div className="rounded-lg border border-[#E8E4DC] bg-[#F8F6F2] px-5 py-4">
-                  <p className="text-sm text-[#6B6B6B]">Price range</p>
-                  <p className="mt-1 text-lg font-medium text-[#1C1C1C]">
+                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
+                  <p className="text-sm text-muted">Price range</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">
                     {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
                   </p>
                 </div>
-                <div className="rounded-lg border border-[#E8E4DC] bg-[#F8F6F2] px-5 py-4">
-                  <p className="text-sm text-[#6B6B6B]">Recommended material</p>
-                  <p className="mt-1 text-lg font-medium text-[#1C1C1C]">
+                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
+                  <p className="text-sm text-muted">Recommended material</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">
                     {loadingPreview ? "…" : previewMaterial ?? "—"}
                   </p>
                 </div>
               </div>
 
               {!loadingPreview && previewRoofLabel && (
-                <p className="mt-6 text-sm text-[#6B6B6B] leading-relaxed">
+                <p className="mt-6 text-sm text-muted leading-relaxed">
                   A quick estimate from your property location. Full satellite analysis refines your quote when you continue.
                 </p>
               )}
@@ -321,9 +321,9 @@ export default function Home() {
       )}
 
       {/* How it works */}
-      <section className="py-16 md:py-20 border-t border-[#E8E4DC]">
+      <section className="py-16 md:py-20 border-t border-border-subtle">
         <div className="container-max">
-          <h2 className="font-serif text-2xl md:text-3xl">How it works</h2>
+          <h2 className="font-heading text-2xl md:text-3xl">How it works</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {[
               { step: "01", text: "Enter your address" },
@@ -332,10 +332,10 @@ export default function Home() {
             ].map((item) => (
               <div
                 key={item.step}
-                className="rounded-lg border border-[#E8E4DC] bg-white px-6 py-8"
+                className="rounded-lg border border-border-subtle bg-surface px-6 py-8"
               >
-                <span className="text-sm text-[#C9A96E] font-medium tracking-widest">{item.step}</span>
-                <p className="mt-4 text-[#1C1C1C] leading-relaxed">{item.text}</p>
+                <span className="text-sm text-accent font-medium tracking-widest">{item.step}</span>
+                <p className="mt-4 text-foreground leading-relaxed">{item.text}</p>
               </div>
             ))}
           </div>
@@ -345,17 +345,17 @@ export default function Home() {
       {/* Testimonials */}
       <section className="py-16 md:py-20">
         <div className="container-max">
-          <h2 className="font-serif text-2xl md:text-3xl">What homeowners say</h2>
+          <h2 className="font-heading text-2xl md:text-3xl">What homeowners say</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {testimonials.map((t) => (
               <article
                 key={t.id}
-                className="rounded-lg border border-[#E8E4DC] bg-white px-6 py-8 flex flex-col"
+                className="rounded-lg border border-border-subtle bg-surface px-6 py-8 flex flex-col"
               >
-                <p className="text-[#1C1C1C] leading-relaxed flex-1">&ldquo;{t.quote_text}&rdquo;</p>
-                <div className="mt-6 pt-6 border-t border-[#E8E4DC]">
-                  <p className="font-medium text-[#1C1C1C]">{t.name}</p>
-                  <p className="text-sm text-[#6B6B6B] mt-0.5">{t.location}</p>
+                <p className="text-foreground leading-relaxed flex-1">&ldquo;{t.quote_text}&rdquo;</p>
+                <div className="mt-6 pt-6 border-t border-border-subtle">
+                  <p className="font-medium text-foreground">{t.name}</p>
+                  <p className="text-sm text-muted mt-0.5">{t.location}</p>
                 </div>
               </article>
             ))}
@@ -363,7 +363,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="container-max py-8 text-sm text-[#6B6B6B] border-t border-[#E8E4DC]">
+      <footer className="container-max py-8 text-sm text-muted border-t border-border-subtle">
         Powered by InstaRoof Quote for {companyName}
       </footer>
     </main>
