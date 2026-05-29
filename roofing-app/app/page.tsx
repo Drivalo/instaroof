@@ -30,6 +30,10 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
+  const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
+  const [previewMaterial, setPreviewMaterial] = useState<string | null>(null);
   const addressInputRef = useRef<AddressAutocompleteHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -53,33 +57,12 @@ export default function Home() {
     [bootstrap],
   );
 
-  const previewAddress = placeDetails?.address ?? address;
-
-  const previewPriceRange = useMemo(() => {
-    const lowUsd = 8000;
-    const highUsd = 12000;
-    const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-
-    if (previewAddress.includes("UK")) {
-      return `£${fmt(lowUsd * 0.79)}-£${fmt(highUsd * 0.79)}`;
-    }
-    if (previewAddress.includes("Australia")) {
-      const rateAud = Number(bootstrap?.settings?.currency_rate_aud ?? 1.53);
-      return `A$${fmt(lowUsd * rateAud)}-A$${fmt(highUsd * rateAud)}`;
-    }
-    if (previewAddress.includes("New Zealand")) {
-      const rateNzd = Number(bootstrap?.settings?.currency_rate_nzd ?? 1.64);
-      return `NZ$${fmt(lowUsd * rateNzd)}-NZ$${fmt(highUsd * rateNzd)}`;
-    }
-    return `$${fmt(lowUsd)}-$${fmt(highUsd)}`;
-  }, [previewAddress, bootstrap?.settings]);
-
   useEffect(() => {
     if (!mockQuoteVisible || !previewSectionRef.current) return;
     previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [mockQuoteVisible]);
 
-  function createLead() {
+  async function createLead() {
     const inputValue = addressInputRef.current?.getValue() ?? "";
     const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
 
@@ -93,11 +76,55 @@ export default function Home() {
     }
 
     const detailsFromInput = addressInputRef.current?.getPlaceDetails();
+    const details = detailsFromInput ?? placeDetails;
     if (detailsFromInput && !placeDetails) {
       setPlaceDetails(detailsFromInput);
     }
 
+    const lat = details?.latitude;
+    const lng = details?.longitude;
+    if (
+      lat == null ||
+      lng == null ||
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng) ||
+      (lat === 0 && lng === 0)
+    ) {
+      alert("Please select your address from the dropdown so we can estimate your roof size.");
+      return;
+    }
+
     setMockQuoteVisible(true);
+    setLoadingPreview(true);
+    setPreviewRoofLabel(null);
+    setPreviewPriceRange(null);
+    setPreviewMaterial(null);
+
+    try {
+      const res = await fetch("/api/leads/preview-estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: details?.address ?? resolvedAddress,
+          latitude: lat,
+          longitude: lng,
+          country_code: details?.countryCode ?? null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not estimate roof size");
+      }
+      setPreviewRoofLabel(data.area?.label ?? `${data.roof_sqft} sq ft`);
+      setPreviewPriceRange(data.price_range ?? null);
+      setPreviewMaterial(data.material ?? null);
+    } catch (err) {
+      console.error("[createLead] preview estimate failed:", err);
+      alert(err instanceof Error ? err.message : "Could not estimate roof size. Try selecting the address again.");
+      setMockQuoteVisible(false);
+    } finally {
+      setLoadingPreview(false);
+    }
   }
 
   async function createRealLead() {
@@ -211,10 +238,11 @@ export default function Home() {
             <button
               type="button"
               onClick={createLead}
-              className="relative z-10 rounded-xl px-6 py-4 font-semibold text-white shrink-0"
+              disabled={loadingPreview}
+              className="relative z-10 rounded-xl px-6 py-4 font-semibold text-white shrink-0 disabled:opacity-50"
               style={{ background: brand.primary_color }}
             >
-              Get My Instant Quote
+              {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
             </button>
           </div>
           <input
@@ -237,20 +265,32 @@ export default function Home() {
             <h2 className="text-2xl font-bold">Your Instant Quote</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <p className="rounded-lg bg-zinc-100 p-3">
-                Estimated roof size: <strong>120m²</strong>
+                Estimated roof size:{" "}
+                <strong>
+                  {loadingPreview
+                    ? "Calculating…"
+                    : previewRoofLabel ?? "—"}
+                </strong>
               </p>
               <p className="rounded-lg bg-zinc-100 p-3">
-                Price range: <strong>{previewPriceRange}</strong>
+                Price range:{" "}
+                <strong>{loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}</strong>
               </p>
               <p className="rounded-lg bg-zinc-100 p-3">
-                Recommended material: <strong>Colorbond steel</strong>
+                Recommended material:{" "}
+                <strong>{loadingPreview ? "…" : previewMaterial ?? "—"}</strong>
               </p>
             </div>
+            {!loadingPreview && previewRoofLabel && (
+              <p className="mt-2 text-xs text-zinc-500">
+                Quick estimate from your property location. Full AI satellite analysis refines this after you continue.
+              </p>
+            )}
             <div className="mt-4">
               <button
                 type="button"
                 onClick={createRealLead}
-                disabled={loadingAnalysis}
+                disabled={loadingAnalysis || loadingPreview || !previewRoofLabel}
                 className="rounded-lg bg-[#1F2937] px-4 py-2 text-white disabled:opacity-50"
               >
                 {loadingAnalysis ? "Starting analysis..." : "Continue with full AI analysis"}
