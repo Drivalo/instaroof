@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AddressAutocomplete, {
+  AddressAutocompleteHandle,
   AddressPlaceDetails,
   hasGoogleMapsKey,
 } from "@/components/address-autocomplete";
@@ -29,6 +30,8 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const addressInputRef = useRef<AddressAutocompleteHandle>(null);
+  const previewSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     fetch("/api/public/bootstrap")
@@ -71,10 +74,30 @@ export default function Home() {
     return `$${fmt(lowUsd)}-$${fmt(highUsd)}`;
   }, [previewAddress, bootstrap?.settings]);
 
-  async function createLead() {
-    if (!address) return;
+  useEffect(() => {
+    if (!mockQuoteVisible || !previewSectionRef.current) return;
+    previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [mockQuoteVisible]);
+
+  function createLead() {
+    const inputValue = addressInputRef.current?.getValue() ?? "";
+    const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
+
+    if (!resolvedAddress) {
+      alert("Please enter your property address.");
+      return;
+    }
+
+    if (resolvedAddress !== address) {
+      setAddress(resolvedAddress);
+    }
+
+    const detailsFromInput = addressInputRef.current?.getPlaceDetails();
+    if (detailsFromInput && !placeDetails) {
+      setPlaceDetails(detailsFromInput);
+    }
+
     setMockQuoteVisible(true);
-    return;
   }
 
   async function createRealLead() {
@@ -174,6 +197,7 @@ export default function Home() {
           </p>
           <div className="mt-8 grid gap-3 md:grid-cols-[1fr_auto]">
             <AddressAutocomplete
+              ref={addressInputRef}
               className="w-full rounded-xl border border-zinc-300 p-4"
               placeholder="Enter your property address"
               onAddressChange={setAddress}
@@ -185,8 +209,9 @@ export default function Home() {
               </p>
             )}
             <button
+              type="button"
               onClick={createLead}
-              className="rounded-xl px-6 py-4 font-semibold text-white"
+              className="relative z-10 rounded-xl px-6 py-4 font-semibold text-white shrink-0"
               style={{ background: brand.primary_color }}
             >
               Get My Instant Quote
@@ -207,7 +232,7 @@ export default function Home() {
       </section>
 
       {mockQuoteVisible && (
-        <section className="container-max py-8">
+        <section ref={previewSectionRef} className="container-max py-8">
           <div className="rounded-xl border bg-white p-6">
             <h2 className="text-2xl font-bold">Your Instant Quote</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -223,6 +248,7 @@ export default function Home() {
             </div>
             <div className="mt-4">
               <button
+                type="button"
                 onClick={createRealLead}
                 disabled={loadingAnalysis}
                 className="rounded-lg bg-[#1F2937] px-4 py-2 text-white disabled:opacity-50"

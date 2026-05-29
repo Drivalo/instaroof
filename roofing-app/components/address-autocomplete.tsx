@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -22,6 +22,11 @@ export type AddressPlaceDetails = {
   zipCode: string;
   /** ISO 3166-1 alpha-2 from Google Places (e.g. GB, AU, NZ, US) */
   countryCode: string;
+};
+
+export type AddressAutocompleteHandle = {
+  getValue: () => string;
+  getPlaceDetails: () => AddressPlaceDetails | null;
 };
 
 type AddressAutocompleteProps = {
@@ -75,15 +80,20 @@ function loadGoogleMapsScript(): Promise<void> {
   });
 }
 
-export default function AddressAutocomplete({
-  onAddressChange,
-  onPlaceSelected,
-  className,
-  placeholder = "Enter your property address",
-}: AddressAutocompleteProps) {
+const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocompleteProps>(
+  function AddressAutocomplete(
+    { onAddressChange, onPlaceSelected, className, placeholder = "Enter your property address" },
+    ref,
+  ) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedPlace, setSelectedPlace] = useState<AddressPlaceDetails | null>(null);
   const onAddressChangeRef = useRef(onAddressChange);
   const onPlaceSelectedRef = useRef(onPlaceSelected);
+
+  useImperativeHandle(ref, () => ({
+    getValue: () => inputRef.current?.value?.trim() ?? "",
+    getPlaceDetails: () => selectedPlace,
+  }));
 
   useEffect(() => {
     onAddressChangeRef.current = onAddressChange;
@@ -126,13 +136,15 @@ export default function AddressAutocomplete({
             place?.address_components?.find((c: { types: string[]; short_name: string }) =>
               c.types.includes("country"),
             )?.short_name || "";
-          onPlaceSelectedRef.current?.({
+          const details: AddressPlaceDetails = {
             address: formatted,
             latitude: place?.geometry?.location?.lat() || 0,
             longitude: place?.geometry?.location?.lng() || 0,
             zipCode: zip,
             countryCode,
-          });
+          };
+          setSelectedPlace(details);
+          onPlaceSelectedRef.current?.(details);
         });
       })
       .catch((err) => {
@@ -151,10 +163,16 @@ export default function AddressAutocomplete({
       autoComplete="off"
       className={className}
       placeholder={placeholder}
-      onChange={(e) => onAddressChangeRef.current(e.target.value)}
+      onChange={(e) => {
+        setSelectedPlace(null);
+        onAddressChangeRef.current(e.target.value);
+      }}
     />
   );
-}
+},
+);
+
+export default AddressAutocomplete;
 
 export function hasGoogleMapsKey() {
   return Boolean(GOOGLE_MAPS_KEY);

@@ -246,6 +246,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         Estimate based on AI satellite analysis. Final pricing confirmed at free in-person inspection.
       </p>
 
+      {lead.latitude != null && lead.longitude != null && (
+        <Link
+          href={`/analyzing?leadId=${id}&lat=${lead.latitude}&lng=${lead.longitude}&force=true`}
+          className="mt-3 inline-block text-sm text-[#C8102E] underline"
+        >
+          Re-run roof analysis
+        </Link>
+      )}
+
       <Link href={`/book/${id}`} className="inline-block mt-6 rounded-xl bg-[#C8102E] px-6 py-4 text-white font-semibold">
         Lock In Your Quote - Book Free Inspection (
         {(() => {

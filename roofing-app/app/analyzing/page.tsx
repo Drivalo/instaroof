@@ -4,7 +4,12 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { satelliteProxyPath } from "@/lib/maps-static";
-import { VISION_ANALYSIS_TIMEOUT_MS, VISION_TIMEOUT_MESSAGE } from "@/lib/vision-constants";
+import {
+  VISION_ANALYSIS_TIMEOUT_MS,
+  VISION_REFUSAL_MESSAGE,
+  VISION_TIMEOUT_MESSAGE,
+  VISION_UNABLE_MESSAGE,
+} from "@/lib/vision-constants";
 
 const steps = [
   "Locating property...",
@@ -21,6 +26,7 @@ function AnalyzingContent() {
   const leadId = searchParams.get("leadId");
   const latParam = searchParams.get("lat");
   const lngParam = searchParams.get("lng");
+  const forceReanalyze = searchParams.get("force") === "true";
 
   const [index, setIndex] = useState(0);
   const [fallbackImageUrl, setFallbackImageUrl] = useState("");
@@ -66,16 +72,18 @@ function AnalyzingContent() {
   }, [leadId, latParam, lngParam]);
 
   const analyzeLead = useCallback(
-    async (id: string) => {
+    async (id: string, options?: { force?: boolean }) => {
       const runId = ++runIdRef.current;
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       const clientTimeout = setTimeout(() => controller.abort(), VISION_ANALYSIS_TIMEOUT_MS);
+      const force = options?.force === true;
+      const url = force ? `/api/leads/${id}/analyze?force=true` : `/api/leads/${id}/analyze`;
 
       try {
-        const res = await fetch(`/api/leads/${id}/analyze`, {
+        const res = await fetch(url, {
           method: "POST",
           signal: controller.signal,
         });
@@ -85,11 +93,21 @@ function AnalyzingContent() {
 
         if (!res.ok) {
           const message =
-            data.code === "VISION_TIMEOUT" || res.status === 504
-              ? VISION_TIMEOUT_MESSAGE
-              : data.error || "Analysis failed";
+            data.userMessage ||
+            (data.code === "VISION_REFUSAL"
+              ? VISION_REFUSAL_MESSAGE
+              : data.code === "VISION_UNABLE"
+                ? VISION_UNABLE_MESSAGE
+                : data.code === "VISION_TIMEOUT" || res.status === 504
+                  ? VISION_TIMEOUT_MESSAGE
+                  : data.error || "Analysis failed");
           setAnalysisError(message);
           setAnalyzing(false);
+          return;
+        }
+
+        if (data.cached && data.lead?.roof_sqft != null) {
+          router.push(`/quote/${id}`);
           return;
         }
 
@@ -121,21 +139,21 @@ function AnalyzingContent() {
       const separator = imageUrl.includes("?") ? "&" : "?";
       setFallbackImageUrl(`${imageUrl.replace(/[&?]retry=\d+/, "")}${separator}retry=${Date.now()}`);
     }
-    void analyzeLead(leadId);
+    void analyzeLead(leadId, { force: true });
   }, [analyzeLead, imageUrl, leadId]);
 
   useEffect(() => {
     if (!leadId) return;
 
     const timer = window.setTimeout(() => {
-      void analyzeLead(leadId);
+      void analyzeLead(leadId, { force: forceReanalyze });
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
       abortRef.current?.abort();
     };
-  }, [leadId, analyzeLead]);
+  }, [leadId, analyzeLead, forceReanalyze]);
 
   useEffect(() => {
     if (!analyzing || analysisError) return;
