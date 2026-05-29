@@ -122,18 +122,27 @@ export function getCurrencyRates(settings?: Partial<SettingsRow> | null): Curren
   };
 }
 
+/** Coerce quote amounts from API/DB (number or numeric string) to a finite number. */
+function parseUsdAmount(value: number | string): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  const parsed = Number(String(value).replace(/,/g, "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Convert a USD amount to local currency units (unformatted number only). */
 function usdToLocal(usd: number, region: CurrencyRegion, rates: CurrencyRates): number {
-  const amount = Number(usd);
-  if (!Number.isFinite(amount)) return 0;
+  if (!Number.isFinite(usd)) return 0;
   switch (region) {
     case "GB":
-      return amount * rates.gbp;
+      return usd * rates.gbp;
     case "AU":
-      return amount * rates.aud;
+      return usd * rates.aud;
     case "NZ":
-      return amount * rates.nzd;
+      return usd * rates.nzd;
     default:
-      return amount;
+      return usd;
   }
 }
 
@@ -160,7 +169,10 @@ export function getCurrencyDisplay(
     code: meta.code,
     label: meta.label,
     formatRange: (lowUsd, highUsd) =>
-      meta.formatRange(usdToLocal(lowUsd, region, rates), usdToLocal(highUsd, region, rates)),
+      meta.formatRange(
+        usdToLocal(parseUsdAmount(lowUsd), region, rates),
+        usdToLocal(parseUsdAmount(highUsd), region, rates),
+      ),
   };
 }
 
