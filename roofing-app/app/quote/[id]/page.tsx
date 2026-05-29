@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SettingsRow } from "@/lib/types";
 
 const contactFieldClass =
-  "w-full rounded-lg border border-border-subtle bg-surface px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
+  "w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
 
 function isValidEmail(value: string) {
   const trimmed = value.trim();
@@ -126,6 +126,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [settings, setSettings] = useState<SettingsRow | null>(null);
   const [contact, setContact] = useState({ name: "", email: "", phone: "" });
   const [savingContact, setSavingContact] = useState(false);
+  const [satelliteReady, setSatelliteReady] = useState(false);
+  const [detailsUnlocked, setDetailsUnlocked] = useState(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -163,32 +165,34 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
   useEffect(() => {
     if (!lead) return;
-    setContact({
-      name: String(lead.name ?? ""),
-      email: String(lead.email ?? ""),
-      phone: String(lead.phone ?? ""),
-    });
+    const name = String(lead.name ?? "");
+    const email = String(lead.email ?? "");
+    const phone = String(lead.phone ?? "");
+    setContact({ name, email, phone });
+    if (name.trim() && isValidEmail(email) && isValidPhone(phone)) {
+      setDetailsUnlocked(true);
+    }
   }, [lead]);
 
   const contactReady =
     contact.name.trim().length > 0 && isValidEmail(contact.email) && isValidPhone(contact.phone);
 
-  async function continueToBooking() {
+  async function saveContactDetails(): Promise<boolean> {
     const name = contact.name.trim();
     const email = contact.email.trim();
     const phone = contact.phone.trim();
 
     if (!name) {
       alert("Please enter your name.");
-      return;
+      return false;
     }
     if (!isValidEmail(email)) {
       alert("Please enter a valid email address.");
-      return;
+      return false;
     }
     if (!isValidPhone(phone)) {
       alert("Please enter a valid phone number.");
-      return;
+      return false;
     }
 
     setSavingContact(true);
@@ -202,12 +206,28 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       if (!res.ok) {
         throw new Error(data.error || "Could not save your details");
       }
-      router.push(`/book/${id}`);
+      if (data.lead) setLead(data.lead);
+      setDetailsUnlocked(true);
+      return true;
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not save your details. Please try again.");
+      return false;
     } finally {
       setSavingContact(false);
     }
+  }
+
+  async function handleSeeMyQuote() {
+    await saveContactDetails();
+  }
+
+  async function continueToBooking() {
+    const name = contact.name.trim();
+    const email = contact.email.trim();
+    const phone = contact.phone.trim();
+
+    const saved = await saveContactDetails();
+    if (saved) router.push(`/book/${id}`);
   }
 
   const polygonPoints = useMemo(() => {
@@ -229,12 +249,102 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     return fields.some((v) => v != null && Number(v) > 0);
   }, [lead]);
 
+  const satelliteSrc = lead ? String(lead.satellite_image_url ?? "").trim() : "";
+
+  useEffect(() => {
+    if (!satelliteSrc) setSatelliteReady(true);
+  }, [satelliteSrc]);
+
+  useEffect(() => {
+    const showModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
+    if (!showModal) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [hasQuoteEstimates, satelliteReady, detailsUnlocked]);
+
   if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
 
-  const satelliteSrc = String(lead.satellite_image_url ?? "").trim();
+  const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
 
   return (
-    <main className="customer-page container-max py-8">
+    <main className="customer-page container-max py-8 relative">
+      {showDetailsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1C1C]/85"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quote-details-modal-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl">
+            <h2 id="quote-details-modal-title" className="text-xl md:text-2xl text-foreground">
+              Your estimate is ready
+            </h2>
+            <p className="mt-2 text-sm text-muted leading-relaxed">
+              Enter your details to see your full price breakdown
+            </p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="modal-quote-name" className="block text-sm text-muted mb-1.5">
+                  Name
+                </label>
+                <input
+                  id="modal-quote-name"
+                  type="text"
+                  required
+                  autoComplete="name"
+                  className={contactFieldClass}
+                  placeholder="Your full name"
+                  value={contact.name}
+                  onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="modal-quote-email" className="block text-sm text-muted mb-1.5">
+                  Email
+                </label>
+                <input
+                  id="modal-quote-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  className={contactFieldClass}
+                  placeholder="Email"
+                  value={contact.email}
+                  onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="modal-quote-phone" className="block text-sm text-muted mb-1.5">
+                  Phone number
+                </label>
+                <input
+                  id="modal-quote-phone"
+                  type="tel"
+                  required
+                  autoComplete="tel"
+                  className={contactFieldClass}
+                  placeholder="Phone number"
+                  value={contact.phone}
+                  onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleSeeMyQuote()}
+              disabled={!contactReady || savingContact}
+              className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {savingContact ? "Saving…" : "See my quote"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={showDetailsModal ? "pointer-events-none select-none blur-sm" : undefined}>
       <div className="relative w-full max-w-[600px]">
         {satelliteSrc ? (
           <Image
@@ -244,6 +354,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             height={600}
             unoptimized
             className="w-full h-auto rounded-xl border border-border-subtle"
+            onLoad={() => setSatelliteReady(true)}
+            onError={() => setSatelliteReady(true)}
           />
         ) : (
           <div className="flex h-[300px] md:h-[400px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
@@ -374,73 +486,78 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </Link>
       )}
 
-      <section className="mt-8 max-w-md rounded-lg border border-border-subtle bg-surface p-6">
-        <h2 className="text-lg text-foreground">Your details</h2>
-        <p className="mt-1 text-sm text-muted">Required to save your quote and book your free inspection.</p>
-        <div className="mt-5 space-y-4">
-          <div>
-            <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
-              Name
-            </label>
-            <input
-              id="quote-name"
-              type="text"
-              required
-              autoComplete="name"
-              className={contactFieldClass}
-              placeholder="Your full name"
-              value={contact.name}
-              onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label htmlFor="quote-email" className="block text-sm text-muted mb-1.5">
-              Email
-            </label>
-            <input
-              id="quote-email"
-              type="email"
-              required
-              autoComplete="email"
-              className={contactFieldClass}
-              placeholder="Email"
-              value={contact.email}
-              onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label htmlFor="quote-phone" className="block text-sm text-muted mb-1.5">
-              Phone number
-            </label>
-            <input
-              id="quote-phone"
-              type="tel"
-              required
-              autoComplete="tel"
-              className={contactFieldClass}
-              placeholder="Phone number"
-              value={contact.phone}
-              onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-            />
-          </div>
-        </div>
-      </section>
+      {detailsUnlocked && hasQuoteEstimates && (
+        <>
+          <section className="mt-8 max-w-md rounded-lg border border-border-subtle bg-surface p-6">
+            <h2 className="text-lg text-foreground">Your details</h2>
+            <p className="mt-1 text-sm text-muted">Update if needed before booking your free inspection.</p>
+            <div className="mt-5 space-y-4">
+              <div>
+                <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
+                  Name
+                </label>
+                <input
+                  id="quote-name"
+                  type="text"
+                  required
+                  autoComplete="name"
+                  className={contactFieldClass}
+                  placeholder="Your full name"
+                  value={contact.name}
+                  onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-email" className="block text-sm text-muted mb-1.5">
+                  Email
+                </label>
+                <input
+                  id="quote-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  className={contactFieldClass}
+                  placeholder="Email"
+                  value={contact.email}
+                  onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-phone" className="block text-sm text-muted mb-1.5">
+                  Phone number
+                </label>
+                <input
+                  id="quote-phone"
+                  type="tel"
+                  required
+                  autoComplete="tel"
+                  className={contactFieldClass}
+                  placeholder="Phone number"
+                  value={contact.phone}
+                  onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                />
+              </div>
+            </div>
+          </section>
 
-      <button
-        type="button"
-        onClick={continueToBooking}
-        disabled={!contactReady || savingContact}
-        className="mt-6 btn-accent rounded-xl px-6 py-4 tracking-wide disabled:opacity-50"
-      >
-        {savingContact
-          ? "Saving…"
-          : `Lock In Your Quote - Book Free Inspection (${formatDepositPrice(
-              Number(settings?.deposit_amount ?? 50),
-              customerAddress,
-              settings,
-              customerCountry,
-            )} Refundable Deposit)`}
-      </button>
+          <button
+            type="button"
+            onClick={continueToBooking}
+            disabled={!contactReady || savingContact}
+            className="mt-6 btn-accent rounded-xl px-6 py-4 tracking-wide disabled:opacity-50"
+          >
+            {savingContact
+              ? "Saving…"
+              : `Lock In Your Quote - Book Free Inspection (${formatDepositPrice(
+                  Number(settings?.deposit_amount ?? 50),
+                  customerAddress,
+                  settings,
+                  customerCountry,
+                )} Refundable Deposit)`}
+          </button>
+        </>
+      )}
+      </div>
     </main>
   );
 }
