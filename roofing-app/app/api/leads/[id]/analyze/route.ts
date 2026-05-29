@@ -14,7 +14,8 @@ import {
   detectCoordinateFallbackRegion,
   visionAnalysisFromCoordinateFallback,
 } from "@/lib/regional-roof-estimate";
-import { runVisionAnalysis, sendEmail } from "@/lib/integrations";
+import { runVisionAnalysis } from "@/lib/integrations";
+import { sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { VISION_TIMEOUT_MESSAGE } from "@/lib/vision-constants";
 import {
@@ -178,15 +179,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       satellite_image_url: satelliteImageSrcForLead(updated),
     };
 
-    if (updated.email) {
-      const quoteRange = `$${updated.quote_standard_low} - $${updated.quote_standard_high}`;
-      await sendEmail(
-        updated.email,
-        "Your roof quote is ready",
-        settings.email_template_quote_ready
-          .replace("{{customer_name}}", updated.name || "Homeowner")
-          .replace("{{quote_range}}", quoteRange)
-          .replace("{{booking_link}}", `${req.nextUrl.origin}/book/${updated.id}`),
+    if (updated.email?.trim()) {
+      void sendCustomerQuoteReadyEmail(updated.id, req.nextUrl.origin).catch((err) =>
+        console.error("[vision/analyze] customer quote email failed:", err),
       );
     }
 
