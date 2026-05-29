@@ -227,7 +227,7 @@ export default function Home() {
             />
           ) : null}
 
-          <h1 className="hero-headline text-4xl md:text-5xl lg:text-[3.25rem] leading-[1.15] max-w-2xl">
+          <h1 className="hero-headline">
             Get your roof quote in 60 seconds
           </h1>
           <p className="mt-5 text-lg md:text-xl text-muted max-w-xl leading-relaxed">
