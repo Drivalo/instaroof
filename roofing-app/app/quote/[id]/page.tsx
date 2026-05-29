@@ -396,12 +396,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     <main className="customer-page container-max py-8 relative">
       {showDetailsModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1C1C]/85"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           role="dialog"
           aria-modal="true"
           aria-labelledby="quote-details-modal-title"
         >
-          <div className="w-full max-w-md rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl pointer-events-auto">
             <h2 id="quote-details-modal-title" className="text-xl md:text-2xl text-foreground">
               Your estimate is ready
             </h2>
@@ -469,12 +469,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       {showBookingModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1C1C]/85 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-labelledby="quote-booking-modal-title"
         >
-          <div className="w-full max-w-lg rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl my-4">
+          <div className="w-full max-w-lg rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl my-4 pointer-events-auto">
             <h2 id="quote-booking-modal-title" className="text-xl md:text-2xl text-foreground">
               Book your free inspection
             </h2>
@@ -512,7 +512,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div className={showDetailsModal ? "pointer-events-none select-none blur-sm" : undefined}>
       <div className="relative w-full max-w-[600px]">
         {satelliteSrc ? (
           <Image
@@ -534,7 +533,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           <svg viewBox="0 0 600 600" className="absolute inset-0 w-full h-full pointer-events-none">
             <polygon
               points={polygonPoints}
-              fill="rgba(201, 169, 110, 0.35)"
+              fill="none"
               stroke="#C9A96E"
               strokeWidth="3"
             />
@@ -671,7 +670,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           </p>
         </div>
       )}
-      </div>
     </main>
   );
 }
