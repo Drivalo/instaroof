@@ -166,11 +166,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     console.log("[quote] currency detected:", detectQuoteCurrency(customerAddress, customerCountry));
   }, [lead, customerAddress, customerCountry]);
 
-  const quoteCurrency = useMemo(
-    () => detectQuoteCurrency(customerAddress, customerCountry),
-    [customerAddress, customerCountry],
-  );
-
   useEffect(() => {
     if (!lead) return;
     const name = String(lead.name ?? "");
@@ -449,8 +444,16 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
+      {satelliteSrc ? (
+        <SatelliteRoofMap src={satelliteSrc} onImageReady={() => setSatelliteReady(true)} />
+      ) : (
+        <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
+          Satellite image unavailable
+        </div>
+      )}
+
       {showBookInspectionCta && (
-        <section className="mb-8 w-full max-w-2xl">
+        <section className="mt-6 w-full max-w-[600px]">
           <button
             type="button"
             onClick={openBookingModal}
@@ -464,33 +467,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </section>
       )}
 
-      {satelliteSrc ? (
-        <SatelliteRoofMap
-          src={satelliteSrc}
-          polygonCoordinates={lead.polygon_coordinates}
-          onImageReady={() => setSatelliteReady(true)}
-        />
-      ) : (
-        <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
-          Satellite image unavailable
-        </div>
-      )}
-
       <p className="mt-4 text-sm text-muted">
         Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
-      </p>
-      <p className="mt-1 text-sm text-muted">
-        Currency detected:{" "}
-        <strong>
-          {quoteCurrency === "GB"
-            ? "GBP (£)"
-            : quoteCurrency === "AU"
-              ? "AUD (A$)"
-              : quoteCurrency === "NZ"
-                ? "NZD (NZ$)"
-                : "USD ($)"}
-        </strong>
-        {quoteCurrency !== "US" && " — converted from USD using your admin rates"}
       </p>
 
       <div className="grid md:grid-cols-2 gap-3 mt-4">
