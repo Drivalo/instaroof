@@ -3,6 +3,7 @@ import { isInServiceArea } from "@/lib/service-area";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import { getGoogleMapsApiKey, satelliteProxyPath } from "@/lib/maps-static";
 import { getSettings, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
+import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import {
   LEAD_CREATE_USER_MESSAGE,
   isLikelyTransientError,
@@ -150,6 +151,9 @@ export async function POST(req: NextRequest) {
         notes: "Waitlist lead: outside service area",
       });
       if (error) return buildErrorResponse(error, "waitlist insert failed");
+      void sendLeadNotificationEmail(data.id, req.nextUrl.origin, "submitted").catch((err) =>
+        console.error("[leads/create] waitlist notification failed:", err),
+      );
       return NextResponse.json({ waitlist: true, lead: data });
     }
 
@@ -183,6 +187,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) return buildErrorResponse(error, "lead insert failed");
+
+    void sendLeadNotificationEmail(lead.id, req.nextUrl.origin, "submitted").catch((err) =>
+      console.error("[leads/create] lead notification failed:", err),
+    );
 
     return NextResponse.json({ waitlist: false, lead });
   } catch (error) {

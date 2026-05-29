@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { satelliteImageSrcForLead } from "@/lib/maps-static";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -20,6 +21,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.from("leads").update(updates).eq("id", id).select("*").single();
     if (error) throw error;
+
+    void sendLeadNotificationEmail(Number(id), req.nextUrl.origin, "contact_updated").catch((err) =>
+      console.error("[leads/PATCH] company notification failed:", err),
+    );
 
     return NextResponse.json({ lead: data });
   } catch (error) {
