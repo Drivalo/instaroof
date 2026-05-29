@@ -3,12 +3,17 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { addDays, format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SettingsRow } from "@/lib/types";
 
 const contactFieldClass =
   "w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
+
+const slotButtonBase =
+  "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
+const slotButtonSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
 
 function isValidEmail(value: string) {
   const trimmed = value.trim();
@@ -128,6 +133,10 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingContact, setSavingContact] = useState(false);
   const [satelliteReady, setSatelliteReady] = useState(false);
   const [detailsUnlocked, setDetailsUnlocked] = useState(false);
+  const [bookingModalRequested, setBookingModalRequested] = useState(false);
+  const [availability, setAvailability] = useState<any[]>([]);
+  const [inspectionSlot, setInspectionSlot] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -141,6 +150,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         const bootstrapData = await bootstrapRes.json();
         if (leadData.lead) setLead(leadData.lead);
         if (bootstrapData.settings) setSettings(bootstrapData.settings);
+        if (bootstrapData.availability) setAvailability(bootstrapData.availability);
       })
       .catch((err) => console.error("quote page load failed:", err));
   }, [id]);
@@ -208,6 +218,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       }
       if (data.lead) setLead(data.lead);
       setDetailsUnlocked(true);
+      console.info("[quote] saveContactDetails success — detailsUnlocked set to true");
       return true;
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not save your details. Please try again.");
@@ -218,7 +229,63 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   }
 
   async function handleSeeMyQuote() {
-    await saveContactDetails();
+    const saved = await saveContactDetails();
+    if (saved) {
+      setBookingModalRequested(true);
+      console.info("[quote] first modal submitted — showBookingModal set to true", {
+        bookingModalRequested: true,
+        detailsUnlocked: true,
+      });
+    } else {
+      console.warn("[quote] first modal submit failed — booking modal not opened");
+    }
+  }
+
+  const next14DaysSlots = useMemo(() => {
+    const values: string[] = [];
+    const byDay = new Map<number, any>(availability.map((row) => [Number(row.day_of_week), row]));
+    for (let i = 1; i <= 14; i += 1) {
+      const d = addDays(new Date(), i);
+      const row = byDay.get(d.getDay());
+      if (!row || !Array.isArray(row.time_slots) || !row.time_slots.length) continue;
+      const dayIso = format(d, "yyyy-MM-dd");
+      const blackout = (row.blackout_dates || []).map((x: string) => String(x).slice(0, 10));
+      if (blackout.includes(dayIso)) continue;
+      for (const t of row.time_slots) values.push(`${dayIso}T${t}:00`);
+    }
+    return values;
+  }, [availability]);
+
+  async function startInspectionCheckout() {
+    if (!inspectionSlot) {
+      alert("Please select an inspection time.");
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/bookings/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: id,
+          name: contact.name.trim(),
+          phone: contact.phone.trim(),
+          email: contact.email.trim(),
+          bestTimeToContact: null,
+          inspectionDateTime: new Date(inspectionSlot).toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error(data.error || "Could not start checkout");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Checkout failed. Please try again.");
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   async function continueToBooking() {
@@ -255,19 +322,46 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     if (!satelliteSrc) setSatelliteReady(true);
   }, [satelliteSrc]);
 
+  const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
+  const showBookingModal = bookingModalRequested && detailsUnlocked && hasQuoteEstimates;
+  const showInlineBooking = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
+
   useEffect(() => {
-    const showModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
-    if (!showModal) return;
+    console.info("[quote] modal state", {
+      showDetailsModal,
+      showBookingModal,
+      detailsUnlocked,
+      bookingModalRequested,
+      hasQuoteEstimates,
+      satelliteReady,
+    });
+  }, [
+    showDetailsModal,
+    showBookingModal,
+    detailsUnlocked,
+    bookingModalRequested,
+    hasQuoteEstimates,
+    satelliteReady,
+  ]);
+
+  useEffect(() => {
+    const lockScroll = showDetailsModal || showBookingModal;
+    if (!lockScroll) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [hasQuoteEstimates, satelliteReady, detailsUnlocked]);
+  }, [showDetailsModal, showBookingModal]);
 
   if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
 
-  const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
+  const depositLabel = formatDepositPrice(
+    Number(settings?.deposit_amount ?? 50),
+    customerAddress,
+    settings,
+    customerCountry,
+  );
 
   return (
     <main className="customer-page container-max py-8 relative">
@@ -344,7 +438,56 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div className={showDetailsModal ? "pointer-events-none select-none blur-sm" : undefined}>
+      {showBookingModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1C1C]/85 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quote-booking-modal-title"
+        >
+          <div className="w-full max-w-lg rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl my-4">
+            <h2 id="quote-booking-modal-title" className="text-xl md:text-2xl text-foreground">
+              Book your free inspection
+            </h2>
+            <p className="mt-2 text-sm text-muted leading-relaxed">
+              Choose a time slot and pay your refundable deposit to lock in your quote.
+            </p>
+            <p className="mt-4 text-sm text-muted">
+              Refundable deposit: <span className="text-foreground">{depositLabel}</span>
+            </p>
+            <div className="mt-4 grid gap-2 max-h-[280px] overflow-auto pr-1">
+              {next14DaysSlots.length === 0 ? (
+                <p className="text-sm text-muted">No slots available in the next 14 days.</p>
+              ) : (
+                next14DaysSlots.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setInspectionSlot(s)}
+                    className={inspectionSlot === s ? slotButtonSelected : slotButtonBase}
+                  >
+                    {format(new Date(s), "EEE, MMM d — h:mm a")}
+                  </button>
+                ))
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void startInspectionCheckout()}
+              disabled={!inspectionSlot || checkoutLoading}
+              className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {checkoutLoading ? "Redirecting…" : "Continue to Stripe Checkout"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={
+          showDetailsModal || showBookingModal ? "pointer-events-none select-none blur-sm" : undefined
+        }
+      >
       <div className="relative w-full max-w-[600px]">
         {satelliteSrc ? (
           <Image
@@ -486,7 +629,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </Link>
       )}
 
-      {detailsUnlocked && hasQuoteEstimates && (
+      {showInlineBooking && (
         <>
           <section className="mt-8 max-w-md rounded-lg border border-border-subtle bg-surface p-6">
             <h2 className="text-lg text-foreground">Your details</h2>
