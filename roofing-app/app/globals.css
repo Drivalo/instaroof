@@ -39,9 +39,9 @@ body {
 .hero-headline {
   font-family: var(--font-jost), system-ui, sans-serif;
   font-weight: 400;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  font-size: clamp(1.125rem, 2.2vw + 0.4rem, 1.75rem);
+  font-size: clamp(1.25rem, 2.5vw + 0.45rem, 2rem);
   line-height: 1.25;
   max-width: 42rem;
   text-wrap: balance;
