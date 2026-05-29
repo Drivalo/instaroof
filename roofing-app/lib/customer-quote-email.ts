@@ -301,36 +301,59 @@ function resolveSubject(lead: LeadRecord): string {
   return hasInspectionBooking(lead) ? SUBJECT_BOOKED : SUBJECT_QUOTE;
 }
 
+/** Map Supabase row to email lead — country_code optional (column may not exist in DB). */
+export function mapRowToLeadRecord(row: Record<string, unknown>): LeadRecord {
+  return {
+    id: Number(row.id),
+    name: (row.name as string | null) ?? null,
+    email: (row.email as string | null) ?? null,
+    address: String(row.address ?? ""),
+    country_code: (row.country_code as string | null | undefined) ?? null,
+    latitude: (row.latitude as number | null) ?? null,
+    longitude: (row.longitude as number | null) ?? null,
+    roof_sqft: (row.roof_sqft as number | null) ?? null,
+    quote_standard_low: (row.quote_standard_low as number | null) ?? null,
+    quote_standard_high: (row.quote_standard_high as number | null) ?? null,
+    inspection_datetime: (row.inspection_datetime as string | null) ?? null,
+    deposit_paid: (row.deposit_paid as boolean | null) ?? null,
+  };
+}
+
 async function fetchLeadForEmail(leadId: number): Promise<LeadRecord | null> {
   const supabase = getSupabaseAdmin();
-  const { data: lead, error } = await supabase
-    .from("leads")
-    .select(
-      "id, name, email, address, country_code, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid",
-    )
-    .eq("id", leadId)
-    .single();
+  const { data: lead, error } = await supabase.from("leads").select("*").eq("id", leadId).single();
 
   if (error || !lead) {
     console.error("[customer-quote-email] lead fetch failed", { leadId, error: error?.message });
     return null;
   }
 
+  const record = mapRowToLeadRecord(lead as Record<string, unknown>);
+
   console.info("[customer-quote-email] lead loaded from Supabase", {
     leadId,
-    inspection_datetime: lead.inspection_datetime ?? null,
-    deposit_paid: lead.deposit_paid ?? null,
-    address: lead.address,
+    inspection_datetime: record.inspection_datetime ?? null,
+    deposit_paid: record.deposit_paid ?? null,
+    address: record.address,
   });
 
-  return lead as LeadRecord;
+  return record;
 }
 
 async function sendCustomerEmail(
   leadId: number,
   appBaseUrl: string,
-  options: { requireInspection: boolean },
+  options: {
+    requireInspection: boolean;
+    inspectionDatetimeFromConfirm?: string | null;
+    preloadedLead?: LeadRecord | null;
+  },
 ): Promise<CustomerQuoteEmailResult> {
+  console.info("[customer-quote-email] sendCustomerEmail called", {
+    leadId,
+    requireInspection: options.requireInspection,
+    inspectionDatetimeFromConfirm: options.inspectionDatetimeFromConfirm ?? null,
+  });
   ensureEnvLoaded();
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -339,15 +362,45 @@ async function sendCustomerEmail(
     return { sent: false, skipped: true, reason: "RESEND_API_KEY not configured" };
   }
 
-  const record = await fetchLeadForEmail(leadId);
+  const record =
+    options.preloadedLead ?? (await fetchLeadForEmail(leadId));
   if (!record) {
+    console.error("[customer-quote-email] no lead for email", {
+      leadId,
+      hadPreloadedLead: Boolean(options.preloadedLead),
+    });
     return { sent: false, skipped: true, reason: "Lead not found" };
   }
 
-  if (options.requireInspection && !hasInspectionBooking(record)) {
-    console.error("[customer-quote-email] booking email blocked — no inspection_datetime in DB", {
+  const dbInspection = record.inspection_datetime ?? null;
+  const confirmInspection = options.inspectionDatetimeFromConfirm?.trim() || null;
+
+  if (confirmInspection && !dbInspection) {
+    console.warn(
+      "[customer-quote-email] DB missing inspection_datetime — using value from confirm route",
+      { leadId, confirmInspection },
+    );
+    record.inspection_datetime = confirmInspection;
+  } else if (confirmInspection && dbInspection && confirmInspection !== dbInspection) {
+    console.warn("[customer-quote-email] inspection_datetime mismatch confirm vs DB", {
       leadId,
-      inspection_datetime: record.inspection_datetime ?? null,
+      confirmInspection,
+      dbInspection,
+    });
+  }
+
+  console.info("[customer-quote-email] inspection_datetime check", {
+    leadId,
+    dbInspection: record.inspection_datetime ?? null,
+    confirmInspection,
+    hasInspectionBooking: hasInspectionBooking(record),
+  });
+
+  if (options.requireInspection && !hasInspectionBooking(record)) {
+    console.error("[customer-quote-email] booking email BLOCKED — no inspection_datetime", {
+      leadId,
+      inspection_datetime_db: dbInspection,
+      inspection_datetime_confirm: confirmInspection,
     });
     return {
       sent: false,
@@ -358,6 +411,7 @@ async function sendCustomerEmail(
 
   const to = record.email?.trim();
   if (!to) {
+    console.error("[customer-quote-email] booking email BLOCKED — lead has no email", { leadId });
     return { sent: false, skipped: true, reason: "Lead has no email" };
   }
 
@@ -368,6 +422,7 @@ async function sendCustomerEmail(
   const subject = options.requireInspection ? SUBJECT_BOOKED : resolveSubject(record);
 
   try {
+    console.info("[customer-quote-email] calling Resend API", { leadId, from, to, subject });
     const resend = new Resend(apiKey);
     const { data, error: sendError } = await resend.emails.send({
       from,
@@ -378,20 +433,35 @@ async function sendCustomerEmail(
     });
 
     if (sendError) {
-      console.error("[customer-quote-email] Resend error:", sendError);
+      console.error("[customer-quote-email] Resend RETURNED ERROR (booking/customer)", {
+        leadId,
+        to,
+        subject,
+        error: JSON.stringify(sendError),
+        errorMessage: sendError.message,
+      });
       return { sent: false, reason: sendError.message };
     }
 
-    console.info("[customer-quote-email] sent", {
+    if (!data?.id) {
+      console.error("[customer-quote-email] Resend returned no messageId", { leadId, to, data });
+      return { sent: false, reason: "Resend returned no message id" };
+    }
+
+    console.info("[customer-quote-email] Resend SUCCESS (booking/customer)", {
       leadId,
       to,
       subject,
       inspection_datetime: record.inspection_datetime ?? null,
-      messageId: data?.id,
+      messageId: data.id,
     });
-    return { sent: true, messageId: data?.id };
+    return { sent: true, messageId: data.id };
   } catch (err) {
-    console.error("[customer-quote-email] failed:", err);
+    console.error("[customer-quote-email] Resend THREW (booking/customer)", {
+      leadId,
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return {
       sent: false,
       reason: err instanceof Error ? err.message : "Failed to send email",
@@ -407,10 +477,28 @@ export async function sendCustomerQuoteReadyEmail(
   return sendCustomerEmail(leadId, appBaseUrl, { requireInspection: false });
 }
 
+export type BookingConfirmedEmailOptions = {
+  /** Value verified in confirm route — used if DB re-fetch is missing it */
+  inspectionDatetime?: string | null;
+  /** Lead already loaded in confirm route — avoids a second failing query */
+  preloadedLead?: LeadRecord | null;
+};
+
 /** After Stripe payment — requires inspection_datetime from DB before sending. */
 export async function sendCustomerBookingConfirmedEmail(
   leadId: number,
   appBaseUrl: string,
+  options?: BookingConfirmedEmailOptions,
 ): Promise<CustomerQuoteEmailResult> {
-  return sendCustomerEmail(leadId, appBaseUrl, { requireInspection: true });
+  console.info("[customer-quote-email] sendCustomerBookingConfirmedEmail ENTRY", {
+    leadId,
+    inspectionDatetimeFromConfirm: options?.inspectionDatetime ?? null,
+    hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
+    resendFrom: process.env.RESEND_FROM_EMAIL?.trim() || "(default onboarding@resend.dev)",
+  });
+  return sendCustomerEmail(leadId, appBaseUrl, {
+    requireInspection: true,
+    inspectionDatetimeFromConfirm: options?.inspectionDatetime ?? null,
+    preloadedLead: options?.preloadedLead ?? null,
+  });
 }

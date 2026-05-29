@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { getClientNotificationEmail } from "@/lib/client-config";
 import { getCurrencyDisplay } from "@/lib/currency";
+import { formatInspectionSchedule } from "@/lib/inspection-datetime";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import {
   estimateRoofSqftFromAddress,
@@ -11,7 +12,11 @@ import {
 import { getSettings, getSupabaseAdmin } from "@/lib/supabase";
 import { SettingsRow } from "@/lib/types";
 
-export type LeadNotificationContext = "submitted" | "analysis_complete" | "contact_updated";
+export type LeadNotificationContext =
+  | "submitted"
+  | "analysis_complete"
+  | "contact_updated"
+  | "booking_confirmed";
 
 export type LeadNotificationResult = {
   sent: boolean;
@@ -33,6 +38,7 @@ type LeadRecord = {
   quote_standard_low?: number | null;
   quote_standard_high?: number | null;
   status?: string | null;
+  inspection_datetime?: string | null;
 };
 
 function displayValue(value: string | null | undefined): string {
@@ -95,9 +101,17 @@ function formatEstimatedPriceRange(lead: LeadRecord, settings: SettingsRow): str
   return "Pending analysis";
 }
 
+function formatAppointment(lead: LeadRecord): { date: string; time: string } | null {
+  if (!lead.inspection_datetime?.trim()) return null;
+  const schedule = formatInspectionSchedule(lead.inspection_datetime);
+  return { date: schedule.date, time: schedule.time };
+}
+
 function subjectForContext(lead: LeadRecord, context: LeadNotificationContext): string {
   const shortAddress = lead.address.length > 48 ? `${lead.address.slice(0, 48)}…` : lead.address;
   switch (context) {
+    case "booking_confirmed":
+      return `Lead #${lead.id} — inspection booked`;
     case "analysis_complete":
       return `Lead #${lead.id} — quote analysis complete`;
     case "contact_updated":
@@ -110,13 +124,21 @@ function subjectForContext(lead: LeadRecord, context: LeadNotificationContext): 
 function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: string, context: LeadNotificationContext) {
   const roofSize = formatRoofSizeSqm(lead);
   const priceRange = formatEstimatedPriceRange(lead, settings);
+  const appointment = formatAppointment(lead);
 
   const contextNote =
-    context === "analysis_complete"
-      ? "<p style=\"color:#6b6b6b;font-size:14px;\">Satellite analysis has finished and quote ranges are updated.</p>"
-      : context === "contact_updated"
-        ? "<p style=\"color:#6b6b6b;font-size:14px;\">The customer added or updated their contact details on the quote page.</p>"
-        : "<p style=\"color:#6b6b6b;font-size:14px;\">A new property was submitted through InstaRoof Quote.</p>";
+    context === "booking_confirmed"
+      ? "<p style=\"color:#6b6b6b;font-size:14px;\">The customer paid their deposit and booked a roof inspection.</p>"
+      : context === "analysis_complete"
+        ? "<p style=\"color:#6b6b6b;font-size:14px;\">Satellite analysis has finished and quote ranges are updated.</p>"
+        : context === "contact_updated"
+          ? "<p style=\"color:#6b6b6b;font-size:14px;\">The customer added or updated their contact details on the quote page.</p>"
+          : "<p style=\"color:#6b6b6b;font-size:14px;\">A new property was submitted through InstaRoof Quote.</p>";
+
+  const appointmentRows = appointment
+    ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Inspection date</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${appointment.date}</td></tr>
+    <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Inspection time</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${appointment.time}</td></tr>`
+    : "";
 
   return `
 <!DOCTYPE html>
@@ -129,6 +151,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Email</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.email)}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Phone</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.phone)}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Address</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.address}</td></tr>
+    ${appointmentRows}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Roof size</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${roofSize}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Price range</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${priceRange}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Status</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.status)}</td></tr>
@@ -142,6 +165,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
 }
 
 function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: string) {
+  const appointment = formatAppointment(lead);
   return [
     "New lead notification",
     "",
@@ -149,6 +173,9 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     `Email: ${displayValue(lead.email)}`,
     `Phone: ${displayValue(lead.phone)}`,
     `Address: ${lead.address}`,
+    ...(appointment
+      ? [`Inspection date: ${appointment.date}`, `Inspection time: ${appointment.time}`]
+      : []),
     `Roof size: ${formatRoofSizeSqm(lead)}`,
     `Price range: ${formatEstimatedPriceRange(lead, settings)}`,
     `Status: ${displayValue(lead.status)}`,
@@ -163,6 +190,7 @@ export async function sendLeadNotificationEmail(
   adminBaseUrl: string,
   context: LeadNotificationContext = "submitted",
 ): Promise<LeadNotificationResult> {
+  console.info("[lead-notification] sendLeadNotificationEmail called", { leadId, context });
   ensureEnvLoaded();
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -173,19 +201,29 @@ export async function sendLeadNotificationEmail(
 
   const from = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
   const to = getClientNotificationEmail();
+  console.info("[lead-notification] Resend config", { from, to, hasApiKey: true });
 
   const supabase = getSupabaseAdmin();
   const { data: lead, error } = await supabase.from("leads").select("*").eq("id", leadId).single();
 
   if (error || !lead) {
+    console.error("[lead-notification] lead fetch failed", { leadId, error: error?.message });
     return { sent: false, skipped: true, reason: "Lead not found" };
   }
+
+  console.info("[lead-notification] lead loaded from Supabase", {
+    leadId,
+    context,
+    inspection_datetime: lead.inspection_datetime ?? null,
+    status: lead.status ?? null,
+  });
 
   const settings = await getSettings();
   const adminUrl = `${adminBaseUrl.replace(/\/$/, "")}/admin`;
   const subject = subjectForContext(lead as LeadRecord, context);
 
   try {
+    console.info("[lead-notification] calling Resend API", { leadId, context, subject, to });
     const resend = new Resend(apiKey);
     const { data, error: sendError } = await resend.emails.send({
       from,
@@ -196,7 +234,7 @@ export async function sendLeadNotificationEmail(
     });
 
     if (sendError) {
-      console.error("[lead-notification] Resend error:", sendError);
+      console.error("[lead-notification] Resend error:", JSON.stringify(sendError));
       return { sent: false, reason: sendError.message };
     }
 

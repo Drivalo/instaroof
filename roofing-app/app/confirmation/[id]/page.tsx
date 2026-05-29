@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type AppointmentDetails = {
@@ -22,8 +22,13 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     sessionId ? "" : "Missing payment session. Please contact us if you were charged.",
   );
 
+  const confirmStarted = useRef(false);
+
   useEffect(() => {
-    if (!sessionId || !leadId) return;
+    if (!sessionId || !leadId || confirmStarted.current) return;
+    confirmStarted.current = true;
+
+    console.info("[confirmation-page] calling /api/bookings/confirm", { leadId, sessionId });
 
     fetch("/api/bookings/confirm", {
       method: "POST",
@@ -32,6 +37,11 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     })
       .then(async (res) => {
         const data = await res.json();
+        console.info("[confirmation-page] confirm response", {
+          ok: res.ok,
+          status: res.status,
+          data,
+        });
         if (!res.ok || !data.ok) {
           throw new Error(data.error || "Could not confirm your booking");
         }
