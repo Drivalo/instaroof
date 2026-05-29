@@ -1,6 +1,6 @@
 import { Resend } from "resend";
-import { format } from "date-fns";
 import { getCurrencyDisplay, formatDeposit } from "@/lib/currency";
+import { formatInspectionSchedule } from "@/lib/inspection-datetime";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import {
   estimateRoofSqftFromAddress,
@@ -87,16 +87,8 @@ function formatPriceRange(lead: LeadRecord, settings: SettingsRow): string {
 }
 
 function hasInspectionBooking(lead: LeadRecord): boolean {
-  return Boolean(lead.inspection_datetime?.trim());
-}
-
-function formatInspectionSchedule(iso: string): { date: string; time: string; combined: string } {
-  const dt = new Date(iso);
-  return {
-    date: format(dt, "EEEE, MMMM d, yyyy"),
-    time: format(dt, "h:mm a"),
-    combined: format(dt, "EEEE, MMMM d, yyyy 'at' h:mm a"),
-  };
+  const raw = lead.inspection_datetime;
+  return raw != null && String(raw).trim().length > 0;
 }
 
 function formatDepositAmount(lead: LeadRecord, settings: SettingsRow): string {

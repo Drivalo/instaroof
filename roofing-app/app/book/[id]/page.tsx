@@ -85,7 +85,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
         phone: lead.phone,
         email: lead.email,
         bestTimeToContact: null,
-        inspectionDateTime: slot,
+        inspectionDateTime: new Date(slot).toISOString(),
       }),
     });
     const data = await res.json();
