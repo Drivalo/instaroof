@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format } from "date-fns";
+import { sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { getSettings, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
-import { sendBookingSms, sendEmail } from "@/lib/integrations";
+import { sendBookingSms } from "@/lib/integrations";
 import { getStripeClient } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
@@ -40,16 +41,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, paid: true });
     }
 
+    const appBaseUrl =
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      req.headers.get("origin")?.trim() ||
+      "http://localhost:3000";
+    await sendCustomerQuoteReadyEmail(leadId, appBaseUrl);
+
     const dateText = lead.inspection_datetime
       ? format(new Date(lead.inspection_datetime), "PPP 'at' p")
       : "your selected time";
-    await sendEmail(
-      lead.email,
-      `Inspection confirmed for ${dateText}`,
-      settings.email_template_booking_confirmed
-        .replace("{{inspection_date}}", dateText)
-        .replace("{{inspection_time}}", dateText),
-    );
     await sendBookingSms(
       lead.phone,
       `Hi ${lead.name}, this is ${settings.company_name}. Your roof inspection is confirmed for ${dateText}. Reply C to confirm or R to reschedule.`,

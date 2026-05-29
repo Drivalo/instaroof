@@ -1,5 +1,6 @@
 import { Resend } from "resend";
-import { getCurrencyDisplay } from "@/lib/currency";
+import { format } from "date-fns";
+import { getCurrencyDisplay, formatDeposit } from "@/lib/currency";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import {
   estimateRoofSqftFromAddress,
@@ -27,9 +28,12 @@ type LeadRecord = {
   roof_sqft?: number | null;
   quote_standard_low?: number | null;
   quote_standard_high?: number | null;
+  inspection_datetime?: string | null;
+  deposit_paid?: boolean | null;
 };
 
-const SUBJECT = "Your roof quote is ready";
+const SUBJECT_QUOTE = "Your roof quote is ready";
+const SUBJECT_BOOKED = "Your inspection is confirmed";
 
 function resolveRoofSqft(lead: LeadRecord): number | null {
   if (lead.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft))) {
@@ -82,6 +86,81 @@ function formatPriceRange(lead: LeadRecord, settings: SettingsRow): string {
   return "Available on your quote page";
 }
 
+function hasInspectionBooking(lead: LeadRecord): boolean {
+  return Boolean(lead.inspection_datetime?.trim());
+}
+
+function formatInspectionSchedule(iso: string): { date: string; time: string; combined: string } {
+  const dt = new Date(iso);
+  return {
+    date: format(dt, "EEEE, MMMM d, yyyy"),
+    time: format(dt, "h:mm a"),
+    combined: format(dt, "EEEE, MMMM d, yyyy 'at' h:mm a"),
+  };
+}
+
+function formatDepositAmount(lead: LeadRecord, settings: SettingsRow): string {
+  const usd = settings.deposit_amount > 0 ? Number(settings.deposit_amount) : 50;
+  return formatDeposit(
+    usd,
+    lead.address,
+    settings,
+    lead.country_code,
+    lead.latitude,
+    lead.longitude,
+  );
+}
+
+function appointmentHtml(lead: LeadRecord, settings: SettingsRow): string {
+  if (!lead.inspection_datetime) return "";
+  const schedule = formatInspectionSchedule(lead.inspection_datetime);
+  const deposit = formatDepositAmount(lead, settings);
+  const phone = settings.company_phone?.trim() || "";
+  const email = settings.company_email?.trim() || "";
+  const contactLines: string[] = [];
+  if (phone) contactLines.push(`<strong style="color:#ffffff;">${phone}</strong>`);
+  if (email) {
+    contactLines.push(
+      `<a href="mailto:${email}" style="color:#f5a623;text-decoration:none;">${email}</a>`,
+    );
+  }
+  const contactHtml =
+    contactLines.length > 0
+      ? contactLines.join(" &nbsp;·&nbsp; ")
+      : "Reply to this email and we will help you.";
+
+  return `
+              <p style="margin:0 0 12px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">Your inspection</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 24px;">
+                <tr>
+                  <td style="padding:14px 16px;background-color:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;">
+                    <p style="margin:0 0 4px;font-size:12px;color:#a0a0a0;">Date</p>
+                    <p style="margin:0;font-size:16px;font-weight:500;color:#ffffff;">${schedule.date}</p>
+                  </td>
+                </tr>
+                <tr><td style="height:10px;"></td></tr>
+                <tr>
+                  <td style="padding:14px 16px;background-color:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;">
+                    <p style="margin:0 0 4px;font-size:12px;color:#a0a0a0;">Time</p>
+                    <p style="margin:0;font-size:16px;font-weight:500;color:#ffffff;">${schedule.time}</p>
+                  </td>
+                </tr>
+                <tr><td style="height:10px;"></td></tr>
+                <tr>
+                  <td style="padding:14px 16px;background-color:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;">
+                    <p style="margin:0 0 4px;font-size:12px;color:#a0a0a0;">Address</p>
+                    <p style="margin:0;font-size:16px;font-weight:500;color:#ffffff;line-height:1.4;">${lead.address}</p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#a0a0a0;">
+                Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.
+              </p>
+              <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
+                Need to reschedule? Contact us at ${contactHtml}.
+              </p>`;
+}
+
 function buildHtml(
   lead: LeadRecord,
   settings: SettingsRow,
@@ -91,6 +170,24 @@ function buildHtml(
   const roofSize = formatRoofSizeSqm(lead);
   const priceRange = formatPriceRange(lead, settings);
   const companyName = settings.company_name || "your roofing company";
+  const booked = hasInspectionBooking(lead);
+  const headline = booked ? "Your inspection is confirmed" : "Your roof quote is ready";
+  const intro = booked
+    ? `Hi ${firstName}, thank you for booking with ${companyName}. Your free roof inspection is scheduled. Here is a summary of your estimate and appointment details.`
+    : `Hi ${firstName}, thank you for using our instant quote service. Here is a summary of your estimate for <span style="color:#ffffff;">${lead.address}</span>.`;
+  const followUp = booked
+    ? `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#a0a0a0;">
+                A roofing specialist from ${companyName} will meet you at the property at the scheduled time.
+              </p>
+              <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
+                Final price is confirmed at your inspection. There is no obligation to proceed.
+              </p>`
+    : `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#a0a0a0;">
+                A roofing specialist from ${companyName} will be in touch shortly to answer any questions.
+              </p>
+              <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
+                Final price is confirmed at your free inspection. Book with no obligation when you are ready.
+              </p>`;
 
   return `
 <!DOCTYPE html>
@@ -107,11 +204,11 @@ function buildHtml(
           <tr>
             <td style="padding:32px 28px;">
               <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">InstaRoof Quote</p>
-              <h1 style="margin:0 0 20px;font-size:22px;font-weight:500;color:#ffffff;line-height:1.3;">Your roof quote is ready</h1>
+              <h1 style="margin:0 0 20px;font-size:22px;font-weight:500;color:#ffffff;line-height:1.3;">${headline}</h1>
               <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#a0a0a0;">
-                Hi ${firstName}, thank you for using our instant quote service. Here is a summary of your estimate for
-                <span style="color:#ffffff;">${lead.address}</span>.
+                ${intro}
               </p>
+              ${appointmentHtml(lead, settings)}
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 24px;">
                 <tr>
                   <td style="padding:14px 16px;background-color:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;">
@@ -127,12 +224,7 @@ function buildHtml(
                   </td>
                 </tr>
               </table>
-              <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#a0a0a0;">
-                A roofing specialist from ${companyName} will be in touch shortly to answer any questions.
-              </p>
-              <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
-                Final price is confirmed at your free inspection. Book with no obligation when you are ready.
-              </p>
+              ${followUp}
               <a href="${quoteUrl}" style="display:inline-block;background-color:#f5a623;color:#1c1c1c;text-decoration:none;font-size:14px;font-weight:500;padding:14px 24px;border-radius:8px;">View your quote</a>
             </td>
           </tr>
@@ -149,22 +241,72 @@ function buildHtml(
 
 function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: string, firstName: string) {
   const companyName = settings.company_name || "your roofing company";
-  return [
-    "Your roof quote is ready",
+  const booked = hasInspectionBooking(lead);
+  const lines: string[] = [
+    booked ? "Your inspection is confirmed" : "Your roof quote is ready",
     "",
     `Hi ${firstName},`,
     "",
-    "Thank you for using our instant quote service.",
-    "",
-    `Property: ${lead.address}`,
+  ];
+
+  if (booked && lead.inspection_datetime) {
+    const schedule = formatInspectionSchedule(lead.inspection_datetime);
+    const deposit = formatDepositAmount(lead, settings);
+    lines.push(
+      `Your free roof inspection with ${companyName} is scheduled.`,
+      "",
+      "Your inspection",
+      `Date: ${schedule.date}`,
+      `Time: ${schedule.time}`,
+      `Address: ${lead.address}`,
+      "",
+      `Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.`,
+      "",
+    );
+    const phone = settings.company_phone?.trim();
+    const email = settings.company_email?.trim();
+    if (phone || email) {
+      lines.push(
+        "Need to reschedule?",
+        phone ? `Phone: ${phone}` : "",
+        email ? `Email: ${email}` : "",
+        "",
+      );
+    } else {
+      lines.push("Need to reschedule? Reply to this email and we will help you.", "");
+    }
+  } else {
+    lines.push(
+      "Thank you for using our instant quote service.",
+      "",
+      `Property: ${lead.address}`,
+    );
+  }
+
+  lines.push(
     `Estimated roof size: ${formatRoofSizeSqm(lead)}`,
     `Estimated price range: ${formatPriceRange(lead, settings)}`,
     "",
-    `A roofing specialist from ${companyName} will be in touch shortly.`,
-    "Final price is confirmed at your free inspection. Book with no obligation when you are ready.",
-    "",
-    `View your quote: ${quoteUrl}`,
-  ].join("\n");
+  );
+
+  if (booked) {
+    lines.push(
+      `A roofing specialist from ${companyName} will meet you at the property at the scheduled time.`,
+      "Final price is confirmed at your inspection. There is no obligation to proceed.",
+    );
+  } else {
+    lines.push(
+      `A roofing specialist from ${companyName} will be in touch shortly.`,
+      "Final price is confirmed at your free inspection. Book with no obligation when you are ready.",
+    );
+  }
+
+  lines.push("", `View your quote: ${quoteUrl}`);
+  return lines.join("\n");
+}
+
+function resolveSubject(lead: LeadRecord): string {
+  return hasInspectionBooking(lead) ? SUBJECT_BOOKED : SUBJECT_QUOTE;
 }
 
 export async function sendCustomerQuoteReadyEmail(
@@ -196,13 +338,14 @@ export async function sendCustomerQuoteReadyEmail(
   const firstName = (record.name?.trim().split(/\s+/)[0] || "there").replace(/[<>]/g, "");
   const quoteUrl = `${appBaseUrl.replace(/\/$/, "")}/quote/${leadId}`;
   const from = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const subject = resolveSubject(record);
 
   try {
     const resend = new Resend(apiKey);
     const { data, error: sendError } = await resend.emails.send({
       from,
       to: [to],
-      subject: SUBJECT,
+      subject,
       html: buildHtml(record, settings, quoteUrl, firstName),
       text: buildPlainText(record, settings, quoteUrl, firstName),
     });
@@ -212,7 +355,7 @@ export async function sendCustomerQuoteReadyEmail(
       return { sent: false, reason: sendError.message };
     }
 
-    console.info("[customer-quote-email] sent", { leadId, to, messageId: data?.id });
+    console.info("[customer-quote-email] sent", { leadId, to, subject, messageId: data?.id });
     return { sent: true, messageId: data?.id };
   } catch (err) {
     console.error("[customer-quote-email] failed:", err);
