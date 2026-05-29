@@ -212,7 +212,7 @@ export default function Home() {
   const testimonials = bootstrap?.testimonials?.length ? bootstrap.testimonials : defaultTestimonials;
 
   return (
-    <main className="min-h-screen bg-background text-foreground pb-24">
+    <main className="min-h-screen bg-background text-foreground font-sans font-normal pb-24">
       {/* Hero */}
       <section className="pt-14 md:pt-20 pb-16 md:pb-24">
         <div className="container-max">
@@ -250,7 +250,7 @@ export default function Home() {
                 type="button"
                 onClick={createLead}
                 disabled={loadingPreview}
-                className="relative z-10 btn-accent shrink-0 rounded-lg px-8 py-3.5 text-sm font-medium tracking-wide"
+                className="relative z-10 btn-accent shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide"
               >
                 {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
@@ -277,25 +277,25 @@ export default function Home() {
         <section ref={previewSectionRef} className="pb-16 md:pb-20">
           <div className="container-max">
             <div className="rounded-lg border border-border-subtle bg-surface p-8 md:p-10">
-              <p className="text-xs uppercase tracking-[0.2em] text-accent font-medium">Your estimate</p>
-              <h2 className="font-heading text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
+              <p className="text-xs uppercase tracking-[0.2em] text-accent">Your estimate</p>
+              <h2 className="text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
 
               <div className="mt-8 grid gap-4 md:grid-cols-3">
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Estimated roof size</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">
+                  <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Price range</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">
+                  <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Recommended material</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">
+                  <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "…" : previewMaterial ?? "—"}
                   </p>
                 </div>
@@ -311,7 +311,7 @@ export default function Home() {
                 type="button"
                 onClick={createRealLead}
                 disabled={loadingAnalysis || loadingPreview || !previewRoofLabel}
-                className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm font-medium tracking-wide disabled:opacity-50"
+                className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm tracking-wide disabled:opacity-50"
               >
                 {loadingAnalysis ? "Starting analysis…" : "Continue with full AI analysis"}
               </button>
@@ -323,7 +323,7 @@ export default function Home() {
       {/* How it works */}
       <section className="py-16 md:py-20 border-t border-border-subtle">
         <div className="container-max">
-          <h2 className="font-heading text-2xl md:text-3xl">How it works</h2>
+          <h2 className="text-2xl md:text-3xl">How it works</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {[
               { step: "01", text: "Enter your address" },
@@ -334,7 +334,7 @@ export default function Home() {
                 key={item.step}
                 className="rounded-lg border border-border-subtle bg-surface px-6 py-8"
               >
-                <span className="text-sm text-accent font-medium tracking-widest">{item.step}</span>
+                <span className="text-sm text-accent tracking-widest">{item.step}</span>
                 <p className="mt-4 text-foreground leading-relaxed">{item.text}</p>
               </div>
             ))}
@@ -345,7 +345,7 @@ export default function Home() {
       {/* Testimonials */}
       <section className="py-16 md:py-20">
         <div className="container-max">
-          <h2 className="font-heading text-2xl md:text-3xl">What homeowners say</h2>
+          <h2 className="text-2xl md:text-3xl">What homeowners say</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {testimonials.map((t) => (
               <article
@@ -354,7 +354,7 @@ export default function Home() {
               >
                 <p className="text-foreground leading-relaxed flex-1">&ldquo;{t.quote_text}&rdquo;</p>
                 <div className="mt-6 pt-6 border-t border-border-subtle">
-                  <p className="font-medium text-foreground">{t.name}</p>
+                  <p className="text-foreground">{t.name}</p>
                   <p className="text-sm text-muted mt-0.5">{t.location}</p>
                 </div>
               </article>
