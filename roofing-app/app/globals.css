@@ -41,10 +41,16 @@ body {
   font-weight: 400;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  font-size: clamp(1.25rem, 2.5vw + 0.45rem, 2rem);
+  font-size: clamp(1.0625rem, 2.125vw + 0.38rem, 1.7rem);
   line-height: 1.25;
   max-width: 42rem;
   text-wrap: balance;
+}
+
+@media (min-width: 768px) {
+  .hero-headline {
+    font-size: clamp(1.25rem, 2.5vw + 0.45rem, 2rem);
+  }
 }
 
 .container-max {
