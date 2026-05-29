@@ -102,8 +102,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { address, latitude, longitude, zip_code, country_code, email, utm_source, utm_medium, utm_campaign } =
-      body;
+    const {
+      address,
+      latitude,
+      longitude,
+      zip_code,
+      country_code,
+      email,
+      phone,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+    } = body;
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json(
@@ -132,6 +142,7 @@ export async function POST(req: NextRequest) {
         zip_code,
         country_code: country_code || null,
         email,
+        phone: phone || null,
         utm_source,
         utm_medium,
         utm_campaign,
@@ -168,6 +179,7 @@ export async function POST(req: NextRequest) {
       utm_campaign,
       status: "quoted",
       email: email || null,
+      phone: phone || null,
     });
 
     if (error) return buildErrorResponse(error, "lead insert failed");
