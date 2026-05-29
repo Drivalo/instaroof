@@ -107,18 +107,11 @@ function formatAppointment(lead: LeadRecord): { date: string; time: string } | n
   return { date: schedule.date, time: schedule.time };
 }
 
-function subjectForContext(lead: LeadRecord, context: LeadNotificationContext): string {
-  const shortAddress = lead.address.length > 48 ? `${lead.address.slice(0, 48)}…` : lead.address;
-  switch (context) {
-    case "booking_confirmed":
-      return `Lead #${lead.id} — inspection booked`;
-    case "analysis_complete":
-      return `Lead #${lead.id} — quote analysis complete`;
-    case "contact_updated":
-      return `Lead #${lead.id} — contact details received`;
-    default:
-      return `New lead #${lead.id} — ${shortAddress}`;
-  }
+function subjectForContext(lead: LeadRecord, _context: LeadNotificationContext): string {
+  const customerName = lead.name?.trim();
+  return customerName
+    ? `New roof inquiry — ${customerName}`
+    : `New roof inquiry — Lead #${lead.id}`;
 }
 
 function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: string, context: LeadNotificationContext) {
