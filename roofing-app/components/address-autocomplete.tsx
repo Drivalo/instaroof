@@ -1,11 +1,9 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { detectUserCountry } from "@/lib/detect-country";
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-/** ISO 3166-1 alpha-2 codes: Australia, UK, US, New Zealand */
-const AUTOCOMPLETE_COUNTRIES = ["au", "gb", "us", "nz"] as const;
 
 declare global {
   interface Window {
@@ -85,103 +83,115 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
     { onAddressChange, onPlaceSelected, className, placeholder = "Enter your property address" },
     ref,
   ) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [selectedPlace, setSelectedPlace] = useState<AddressPlaceDetails | null>(null);
-  const onAddressChangeRef = useRef(onAddressChange);
-  const onPlaceSelectedRef = useRef(onPlaceSelected);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [selectedPlace, setSelectedPlace] = useState<AddressPlaceDetails | null>(null);
+    /** undefined = detecting; null = all countries; string = restrict to that ISO2 code */
+    const [restrictCountry, setRestrictCountry] = useState<string | null | undefined>(undefined);
+    const onAddressChangeRef = useRef(onAddressChange);
+    const onPlaceSelectedRef = useRef(onPlaceSelected);
 
-  useImperativeHandle(ref, () => ({
-    getValue: () => inputRef.current?.value?.trim() ?? "",
-    getPlaceDetails: () => selectedPlace,
-  }));
+    useImperativeHandle(ref, () => ({
+      getValue: () => inputRef.current?.value?.trim() ?? "",
+      getPlaceDetails: () => selectedPlace,
+    }));
 
-  useEffect(() => {
-    onAddressChangeRef.current = onAddressChange;
-    onPlaceSelectedRef.current = onPlaceSelected;
-  }, [onAddressChange, onPlaceSelected]);
+    useEffect(() => {
+      onAddressChangeRef.current = onAddressChange;
+      onPlaceSelectedRef.current = onPlaceSelected;
+    }, [onAddressChange, onPlaceSelected]);
 
-  useEffect(() => {
-    if (!GOOGLE_MAPS_KEY || !inputRef.current) return;
-
-    let autocomplete: {
-      addListener: (event: string, cb: () => void) => void;
-      getPlace: () => {
-        formatted_address?: string;
-        geometry?: { location?: { lat: () => number; lng: () => number } };
-        address_components?: Array<{ types: string[]; short_name: string }>;
+    useEffect(() => {
+      let cancelled = false;
+      detectUserCountry().then((code) => {
+        if (!cancelled) setRestrictCountry(code);
+      });
+      return () => {
+        cancelled = true;
       };
-    } | null = null;
-    let cancelled = false;
+    }, []);
 
-    loadGoogleMapsScript()
-      .then(() => {
-        if (cancelled || !inputRef.current || !window.google?.maps?.places) return;
+    useEffect(() => {
+      if (!GOOGLE_MAPS_KEY || !inputRef.current || restrictCountry === undefined) return;
 
-        const instance = new window.google.maps.places.Autocomplete(inputRef.current, {
-          fields: ["formatted_address", "geometry", "address_components"],
-          types: ["address"],
-          componentRestrictions: { country: [...AUTOCOMPLETE_COUNTRIES] },
-        });
-        autocomplete = instance;
+      let cancelled = false;
 
-        instance.addListener("place_changed", () => {
-          const place = instance.getPlace();
-          const formatted = place?.formatted_address || inputRef.current?.value || "";
-          onAddressChangeRef.current(formatted);
-          const zip =
-            place?.address_components?.find((c: { types: string[]; short_name: string }) =>
-              c.types.includes("postal_code"),
-            )?.short_name || "";
-          const countryCode =
-            place?.address_components?.find((c: { types: string[]; short_name: string }) =>
-              c.types.includes("country"),
-            )?.short_name || "";
-          const latFn = place?.geometry?.location?.lat;
-          const lngFn = place?.geometry?.location?.lng;
-          const latitude = typeof latFn === "function" ? latFn() : Number.NaN;
-          const longitude = typeof lngFn === "function" ? lngFn() : Number.NaN;
+      loadGoogleMapsScript()
+        .then(() => {
+          if (cancelled || !inputRef.current || !window.google?.maps?.places) return;
 
-          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-            console.warn("Google Places: missing geometry for selected address");
-            onAddressChangeRef.current(formatted);
-            return;
+          const options: {
+            fields: string[];
+            types: string[];
+            componentRestrictions?: { country: string };
+          } = {
+            fields: ["formatted_address", "geometry", "address_components"],
+            types: ["address"],
+          };
+
+          if (restrictCountry) {
+            options.componentRestrictions = { country: restrictCountry };
           }
 
-          const details: AddressPlaceDetails = {
-            address: formatted,
-            latitude,
-            longitude,
-            zipCode: zip,
-            countryCode,
-          };
-          setSelectedPlace(details);
-          onPlaceSelectedRef.current?.(details);
+          const instance = new window.google.maps.places.Autocomplete(inputRef.current, options);
+
+          instance.addListener("place_changed", () => {
+            const place = instance.getPlace();
+            const formatted = place?.formatted_address || inputRef.current?.value || "";
+            onAddressChangeRef.current(formatted);
+            const zip =
+              place?.address_components?.find((c: { types: string[]; short_name: string }) =>
+                c.types.includes("postal_code"),
+              )?.short_name || "";
+            const countryCode =
+              place?.address_components?.find((c: { types: string[]; short_name: string }) =>
+                c.types.includes("country"),
+              )?.short_name || "";
+            const latFn = place?.geometry?.location?.lat;
+            const lngFn = place?.geometry?.location?.lng;
+            const latitude = typeof latFn === "function" ? latFn() : Number.NaN;
+            const longitude = typeof lngFn === "function" ? lngFn() : Number.NaN;
+
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+              console.warn("Google Places: missing geometry for selected address");
+              onAddressChangeRef.current(formatted);
+              return;
+            }
+
+            const details: AddressPlaceDetails = {
+              address: formatted,
+              latitude,
+              longitude,
+              zipCode: zip,
+              countryCode,
+            };
+            setSelectedPlace(details);
+            onPlaceSelectedRef.current?.(details);
+          });
+        })
+        .catch((err) => {
+          console.error("Google Places autocomplete:", err);
         });
-      })
-      .catch((err) => {
-        console.error("Google Places autocomplete:", err);
-      });
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return () => {
+        cancelled = true;
+      };
+    }, [restrictCountry]);
 
-  return (
-    <input
-      ref={inputRef}
-      type="text"
-      autoComplete="off"
-      className={className}
-      placeholder={placeholder}
-      onChange={(e) => {
-        const value = e.target.value;
-        setSelectedPlace(null);
-        onAddressChangeRef.current(value);
-      }}
-    />
-  );
-},
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        autoComplete="off"
+        className={className}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const value = e.target.value;
+          setSelectedPlace(null);
+          onAddressChangeRef.current(value);
+        }}
+      />
+    );
+  },
 );
 
 export default AddressAutocomplete;
