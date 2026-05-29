@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { satelliteImageSrcForLead } from "@/lib/maps-static";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -26,12 +25,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     void sendLeadNotificationEmail(Number(id), req.nextUrl.origin, "contact_updated").catch((err) =>
       console.error("[leads/PATCH] company notification failed:", err),
     );
-
-    if (typeof email === "string" && email.trim()) {
-      void sendCustomerQuoteReadyEmail(Number(id), req.nextUrl.origin).catch((err) =>
-        console.error("[leads/PATCH] customer quote email failed:", err),
-      );
-    }
 
     return NextResponse.json({ lead: data });
   } catch (error) {

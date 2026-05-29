@@ -469,14 +469,6 @@ async function sendCustomerEmail(
   }
 }
 
-/** Quote flow — inspection may not exist yet. */
-export async function sendCustomerQuoteReadyEmail(
-  leadId: number,
-  appBaseUrl: string,
-): Promise<CustomerQuoteEmailResult> {
-  return sendCustomerEmail(leadId, appBaseUrl, { requireInspection: false });
-}
-
 export type BookingConfirmedEmailOptions = {
   /** Value verified in confirm route — used if DB re-fetch is missing it */
   inspectionDatetime?: string | null;

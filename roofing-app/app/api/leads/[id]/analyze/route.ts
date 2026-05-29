@@ -15,7 +15,6 @@ import {
   visionAnalysisFromCoordinateFallback,
 } from "@/lib/regional-roof-estimate";
 import { runVisionAnalysis } from "@/lib/integrations";
-import { sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { VISION_TIMEOUT_MESSAGE } from "@/lib/vision-constants";
 import {
@@ -178,12 +177,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ...updated,
       satellite_image_url: satelliteImageSrcForLead(updated),
     };
-
-    if (updated.email?.trim()) {
-      void sendCustomerQuoteReadyEmail(updated.id, req.nextUrl.origin).catch((err) =>
-        console.error("[vision/analyze] customer quote email failed:", err),
-      );
-    }
 
     void sendLeadNotificationEmail(updated.id, req.nextUrl.origin, "analysis_complete").catch((err) =>
       console.error("[vision/analyze] company notification failed:", err),
