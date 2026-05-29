@@ -430,7 +430,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         type="button"
         onClick={continueToBooking}
         disabled={!contactReady || savingContact}
-        className="mt-6 rounded-xl bg-[#C8102E] px-6 py-4 text-white disabled:opacity-50"
+        className="mt-6 btn-accent rounded-xl px-6 py-4 tracking-wide disabled:opacity-50"
       >
         {savingContact
           ? "Saving…"
