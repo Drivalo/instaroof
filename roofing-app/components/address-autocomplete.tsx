@@ -136,10 +136,21 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
             place?.address_components?.find((c: { types: string[]; short_name: string }) =>
               c.types.includes("country"),
             )?.short_name || "";
+          const latFn = place?.geometry?.location?.lat;
+          const lngFn = place?.geometry?.location?.lng;
+          const latitude = typeof latFn === "function" ? latFn() : Number.NaN;
+          const longitude = typeof lngFn === "function" ? lngFn() : Number.NaN;
+
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            console.warn("Google Places: missing geometry for selected address");
+            onAddressChangeRef.current(formatted);
+            return;
+          }
+
           const details: AddressPlaceDetails = {
             address: formatted,
-            latitude: place?.geometry?.location?.lat() || 0,
-            longitude: place?.geometry?.location?.lng() || 0,
+            latitude,
+            longitude,
             zipCode: zip,
             countryCode,
           };
@@ -164,8 +175,9 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
       className={className}
       placeholder={placeholder}
       onChange={(e) => {
+        const value = e.target.value;
         setSelectedPlace(null);
-        onAddressChangeRef.current(e.target.value);
+        onAddressChangeRef.current(value);
       }}
     />
   );

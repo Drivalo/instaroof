@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env.server";
-import { getGoogleMapsApiKey, mapsStaticSatelliteUrl } from "@/lib/maps-static";
+import {
+  getGoogleMapsApiKey,
+  mapsStaticSatelliteUrl,
+  maskGoogleMapsKeyInUrl,
+  SATELLITE_STATIC_ZOOM,
+} from "@/lib/maps-static";
 
 export async function GET(req: NextRequest) {
   ensureEnvLoaded();
@@ -21,10 +26,17 @@ export async function GET(req: NextRequest) {
   }
 
   const staticUrl = mapsStaticSatelliteUrl(lat, lng, apiKey);
+  console.info("[maps/satellite] fetching:", maskGoogleMapsKeyInUrl(staticUrl), { zoom: SATELLITE_STATIC_ZOOM });
 
   try {
     const upstream = await fetch(staticUrl);
     const contentType = upstream.headers.get("content-type") || "image/png";
+    const image = await upstream.arrayBuffer();
+    console.info("[maps/satellite] response:", {
+      status: upstream.status,
+      contentType,
+      bytes: image.byteLength,
+    });
 
     if (!upstream.ok) {
       const detail = await upstream.text();
@@ -47,7 +59,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const image = await upstream.arrayBuffer();
     return new NextResponse(image, {
       headers: {
         "Content-Type": contentType,

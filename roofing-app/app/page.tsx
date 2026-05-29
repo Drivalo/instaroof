@@ -62,6 +62,23 @@ export default function Home() {
     previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [mockQuoteVisible]);
 
+  function resolvePlaceOnSubmit() {
+    const fromRef = addressInputRef.current?.getPlaceDetails();
+    const details = fromRef ?? placeDetails;
+    if (fromRef) setPlaceDetails(fromRef);
+    return details;
+  }
+
+  function hasValidCoords(lat?: number, lng?: number) {
+    return (
+      lat != null &&
+      lng != null &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      !(lat === 0 && lng === 0)
+    );
+  }
+
   async function createLead() {
     const inputValue = addressInputRef.current?.getValue() ?? "";
     const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
@@ -75,24 +92,10 @@ export default function Home() {
       setAddress(resolvedAddress);
     }
 
-    const detailsFromInput = addressInputRef.current?.getPlaceDetails();
-    const details = detailsFromInput ?? placeDetails;
-    if (detailsFromInput && !placeDetails) {
-      setPlaceDetails(detailsFromInput);
-    }
-
+    const details = resolvePlaceOnSubmit();
     const lat = details?.latitude;
     const lng = details?.longitude;
-    if (
-      lat == null ||
-      lng == null ||
-      !Number.isFinite(lat) ||
-      !Number.isFinite(lng) ||
-      (lat === 0 && lng === 0)
-    ) {
-      alert("Please select your address from the dropdown so we can estimate your roof size.");
-      return;
-    }
+    const useCoords = hasValidCoords(lat, lng);
 
     setMockQuoteVisible(true);
     setLoadingPreview(true);
@@ -106,8 +109,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           address: details?.address ?? resolvedAddress,
-          latitude: lat,
-          longitude: lng,
+          ...(useCoords ? { latitude: lat, longitude: lng } : {}),
           country_code: details?.countryCode ?? null,
         }),
       });
@@ -120,7 +122,7 @@ export default function Home() {
       setPreviewMaterial(data.material ?? null);
     } catch (err) {
       console.error("[createLead] preview estimate failed:", err);
-      alert(err instanceof Error ? err.message : "Could not estimate roof size. Try selecting the address again.");
+      alert(err instanceof Error ? err.message : "Could not estimate roof size. Please try again.");
       setMockQuoteVisible(false);
     } finally {
       setLoadingPreview(false);
@@ -128,18 +130,22 @@ export default function Home() {
   }
 
   async function createRealLead() {
-    if (!address || !placeDetails?.latitude || !placeDetails?.longitude) {
+    const inputValue = addressInputRef.current?.getValue() ?? "";
+    const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
+    const details = resolvePlaceOnSubmit();
+
+    if (!resolvedAddress || !details || !hasValidCoords(details.latitude, details.longitude)) {
       alert("Please select a full address from the suggestions dropdown.");
       return;
     }
     setLoadingAnalysis(true);
     const params = new URLSearchParams(window.location.search);
     const payload = {
-      address: placeDetails.address,
-      latitude: placeDetails.latitude,
-      longitude: placeDetails.longitude,
-      zip_code: placeDetails.zipCode,
-      country_code: placeDetails.countryCode,
+      address: details.address,
+      latitude: details.latitude,
+      longitude: details.longitude,
+      zip_code: details.zipCode,
+      country_code: details.countryCode,
       email: email || null,
       utm_source: params.get("utm_source"),
       utm_medium: params.get("utm_medium"),
@@ -173,7 +179,7 @@ export default function Home() {
             return;
           }
           router.push(
-            `/analyzing?leadId=${data.lead.id}&lat=${placeDetails.latitude}&lng=${placeDetails.longitude}`,
+            `/analyzing?leadId=${data.lead.id}&lat=${details.latitude}&lng=${details.longitude}`,
           );
           return;
         }
@@ -227,7 +233,10 @@ export default function Home() {
               ref={addressInputRef}
               className="w-full rounded-xl border border-zinc-300 p-4"
               placeholder="Enter your property address"
-              onAddressChange={setAddress}
+              onAddressChange={(value) => {
+                setAddress(value);
+                setPlaceDetails(null);
+              }}
               onPlaceSelected={setPlaceDetails}
             />
             {!hasGoogleMapsKey() && (

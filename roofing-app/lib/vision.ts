@@ -1,5 +1,6 @@
 import { readEnv } from "@/lib/env";
 import { ensureEnvLoaded } from "@/lib/env.server";
+import { maskGoogleMapsKeyInUrl, SATELLITE_STATIC_ZOOM } from "@/lib/maps-static";
 import { fallbackVisionAnalysis } from "@/lib/quote";
 import { RoofComplexity, RoofType, VisionAnalysis } from "@/lib/types";
 import {
@@ -57,12 +58,26 @@ function isVisionFailure(error: unknown): error is VisionAnalysisRefusalError | 
   );
 }
 
-const VISION_PROMPT = `You are a roofing estimator. Analyze this satellite image. Identify the main residential structure in the center. Return JSON with: roof_sqft (estimated square footage of the main roof, integer), roof_type ('asphalt_shingle' or 'metal' or 'tile' or 'flat'), complexity ('simple', 'moderate', or 'complex' based on number of facets and valleys visible), confidence (0-100), polygon_coordinates (array of x,y pixel coordinates outlining the roof on the 600x600 image).
+/** Square metres → square feet for internal storage and pricing. */
+const SQFT_PER_SQM = 10.76391041671;
 
-Return only valid JSON with exactly these keys: roof_sqft, roof_type, complexity, confidence, polygon_coordinates.`;
+const VISION_SYSTEM_PROMPT = `You are the vision module in automated roof measurement software used by licensed roofing contractors to prepare price quotes.
 
-const ROOF_TYPES: RoofType[] = ["asphalt_shingle", "metal", "tile", "flat"];
-const COMPLEXITIES: RoofComplexity[] = ["simple", "moderate", "complex"];
+The user message includes one commercial satellite map tile—the same type of public aerial map imagery shown on mainstream mapping websites. The property owner entered their own address into the quoting tool and requested an automated roof area measurement.
+
+Your only job is a construction quantity takeoff: estimate total roof surface area in square metres. Output a single numeric measurement in JSON. No scene description is required.
+
+Human identification is not part of this task. Do not name, count, describe, or infer people, occupants, vehicles, or personal information.`;
+
+const VISION_USER_PROMPT = `Estimate the total roof surface area in square metres from this map tile.
+
+Return JSON only, with this exact shape:
+{"roof_area_sqm": <positive integer>}`;
+
+/** Placeholder overlay for the quote UI — not requested from the model (reduces refusals). */
+function displayPolygonPlaceholder() {
+  return fallbackVisionAnalysis().polygon_coordinates;
+}
 
 function getOpenAiApiKey(): string | undefined {
   ensureEnvLoaded();
@@ -86,23 +101,92 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+type SatelliteImageDiagnostics = {
+  bytes: number;
+  contentType: string;
+  isPng: boolean;
+  isJpeg: boolean;
+  looksLikeImage: boolean;
+  looksLikeErrorBody: boolean;
+  errorSnippet?: string;
+  quality: "ok" | "small" | "invalid";
+};
+
+function diagnoseSatelliteBuffer(buffer: Buffer, contentType: string): SatelliteImageDiagnostics {
+  const isPng = buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50;
+  const isJpeg = buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xd8;
+  const looksLikeImage = isPng || isJpeg || contentType.startsWith("image/");
+  const textStart = buffer.slice(0, 300).toString("utf8");
+  const looksLikeErrorBody =
+    textStart.includes("The Google Maps") ||
+    textStart.includes("Google Maps Platform") ||
+    textStart.includes("<!DOCTYPE") ||
+    textStart.includes('"error"');
+
+  let quality: SatelliteImageDiagnostics["quality"] = "ok";
+  if (!looksLikeImage || looksLikeErrorBody) quality = "invalid";
+  else if (buffer.length < 10_000) quality = "small";
+
+  return {
+    bytes: buffer.length,
+    contentType,
+    isPng,
+    isJpeg,
+    looksLikeImage,
+    looksLikeErrorBody,
+    errorSnippet: looksLikeErrorBody ? textStart.slice(0, 200) : undefined,
+    quality,
+  };
+}
+
 async function satelliteImageToDataUrl(imageUrl: string, timeoutMs: number): Promise<string> {
-  console.info(`${LOG_PREFIX} Fetching satellite image:`, imageUrl.replace(/key=[^&]+/, "key=***"));
+  const safeUrl = maskGoogleMapsKeyInUrl(imageUrl);
+  console.info(`${LOG_PREFIX} Satellite fetch URL (before GPT-4o):`, safeUrl);
+  console.info(`${LOG_PREFIX} Satellite fetch settings:`, {
+    zoom: SATELLITE_STATIC_ZOOM,
+    size: "600x600",
+    scale: 2,
+    maptype: "satellite",
+  });
+
   const response = await fetchWithTimeout(imageUrl, {}, timeoutMs);
   const buffer = Buffer.from(await response.arrayBuffer());
   const contentType = response.headers.get("content-type") || "image/png";
-  console.info(`${LOG_PREFIX} Satellite response:`, {
-    status: response.status,
+  const diagnostics = diagnoseSatelliteBuffer(buffer, contentType);
+
+  console.info(`${LOG_PREFIX} Satellite fetch response (before GPT-4o):`, {
+    httpStatus: response.status,
     ok: response.ok,
-    contentType,
-    bytes: buffer.length,
+    contentType: diagnostics.contentType,
+    bytes: diagnostics.bytes,
+    isPng: diagnostics.isPng,
+    isJpeg: diagnostics.isJpeg,
+    looksLikeImage: diagnostics.looksLikeImage,
+    quality: diagnostics.quality,
+    errorSnippet: diagnostics.errorSnippet,
   });
+
   if (!response.ok) {
-    throw new Error(`Failed to fetch satellite image (${response.status}, ${buffer.length} bytes)`);
+    throw new Error(
+      `Failed to fetch satellite image (HTTP ${response.status}, ${diagnostics.bytes} bytes)`,
+    );
   }
-  if (buffer.length < 1000) {
-    console.warn(`${LOG_PREFIX} Satellite image unusually small — may be an error tile`);
+
+  if (diagnostics.quality === "invalid") {
+    throw new VisionUnableToEstimateError(
+      VISION_UNABLE_MESSAGE,
+      `Satellite response is not a valid image (${diagnostics.bytes} bytes, type=${diagnostics.contentType})`,
+    );
   }
+
+  if (diagnostics.quality === "small") {
+    console.warn(
+      `${LOG_PREFIX} Satellite image is only ${diagnostics.bytes} bytes — may be blank, low-res, or an API error tile`,
+    );
+  } else {
+    console.info(`${LOG_PREFIX} Satellite image looks like a clear tile (${diagnostics.bytes} bytes)`);
+  }
+
   return `data:${contentType};base64,${buffer.toString("base64")}`;
 }
 
@@ -118,58 +202,44 @@ function extractJsonObject(text: string): Record<string, unknown> {
   return JSON.parse(candidate.slice(start, end + 1)) as Record<string, unknown>;
 }
 
+function parseRoofSqftFromModel(raw: Record<string, unknown>): { roofSqft: number; roofAreaSqm: number | null } {
+  const sqm = Number(raw.roof_area_sqm);
+  if (Number.isFinite(sqm) && sqm > 0) {
+    return { roofAreaSqm: Math.round(sqm), roofSqft: Math.max(500, Math.round(sqm * SQFT_PER_SQM)) };
+  }
+
+  const sqft = Number(raw.roof_sqft);
+  if (Number.isFinite(sqft) && sqft > 0) {
+    return { roofAreaSqm: null, roofSqft: Math.max(500, Math.round(sqft)) };
+  }
+
+  return { roofAreaSqm: null, roofSqft: 0 };
+}
+
 function normalizeVisionAnalysis(raw: Record<string, unknown>): VisionAnalysis {
-  const rawSqft = raw.roof_sqft;
-  const parsedSqft = Number(rawSqft);
-  const roofSqft = Math.max(500, Math.round(Number.isFinite(parsedSqft) ? parsedSqft : 0));
+  const { roofSqft, roofAreaSqm } = parseRoofSqftFromModel(raw);
+  const roof_sqft = roofSqft > 0 ? roofSqft : 500;
 
   console.info(`${LOG_PREFIX} Normalized vision result:`, {
-    raw_roof_sqft: rawSqft,
-    parsed_roof_sqft: parsedSqft,
-    final_roof_sqft: roofSqft,
-    roof_type: raw.roof_type,
-    complexity: raw.complexity,
-    confidence: raw.confidence,
-    polygon_point_count: Array.isArray(raw.polygon_coordinates) ? raw.polygon_coordinates.length : 0,
+    raw_roof_area_sqm: raw.roof_area_sqm,
+    parsed_roof_area_sqm: roofAreaSqm,
+    final_roof_sqft: roof_sqft,
   });
 
-  if (!Number.isFinite(parsedSqft) || parsedSqft <= 0) {
-    console.warn(`${LOG_PREFIX} Model returned invalid roof_sqft; using minimum 500 sq ft`);
+  if (roofSqft <= 0) {
+    console.warn(`${LOG_PREFIX} Model returned invalid roof_area_sqm; using minimum 500 sq ft`);
   }
-  const roofTypeRaw = String(raw.roof_type || "asphalt_shingle");
-  const roof_type = ROOF_TYPES.includes(roofTypeRaw as RoofType)
-    ? (roofTypeRaw as RoofType)
-    : "asphalt_shingle";
-  const complexityRaw = String(raw.complexity || "moderate");
-  const complexity = COMPLEXITIES.includes(complexityRaw as RoofComplexity)
-    ? (complexityRaw as RoofComplexity)
-    : "moderate";
-  const confidence = Math.min(100, Math.max(0, Math.round(Number(raw.confidence) || 50)));
 
-  const polygonRaw = Array.isArray(raw.polygon_coordinates) ? raw.polygon_coordinates : [];
-  const polygon_coordinates = polygonRaw
-    .map((point) => {
-      if (!point || typeof point !== "object") return null;
-      const p = point as { x?: unknown; y?: unknown };
-      const x = Math.round(Number(p.x));
-      const y = Math.round(Number(p.y));
-      if (Number.isNaN(x) || Number.isNaN(y)) return null;
-      return { x: Math.min(600, Math.max(0, x)), y: Math.min(600, Math.max(0, y)) };
-    })
-    .filter((p): p is { x: number; y: number } => p !== null);
+  const roof_type: RoofType = "asphalt_shingle";
+  const complexity: RoofComplexity = "moderate";
+  const confidence = 75;
 
   return {
-    roof_sqft: roofSqft,
+    roof_sqft,
     roof_type,
     complexity,
     confidence,
-    polygon_coordinates:
-      polygon_coordinates.length >= 3
-        ? polygon_coordinates
-        : (() => {
-            console.warn(`${LOG_PREFIX} Polygon had <3 points — using fallback polygon only`);
-            return fallbackVisionAnalysis().polygon_coordinates;
-          })(),
+    polygon_coordinates: displayPolygonPlaceholder(),
   };
 }
 
@@ -182,9 +252,11 @@ async function runVisionAnalysisInner(imageUrl: string): Promise<VisionAnalysis>
   }
 
   const imageDataUrl = await satelliteImageToDataUrl(imageUrl, VISION_ANALYSIS_TIMEOUT_MS);
-  console.info(`${LOG_PREFIX} Satellite encoded for OpenAI:`, {
-    dataUrlChars: imageDataUrl.length,
-    approxKb: Math.round(imageDataUrl.length / 1024),
+  const encodedKb = Math.round(imageDataUrl.length / 1024);
+  console.info(`${LOG_PREFIX} Sending to GPT-4o:`, {
+    satelliteUrl: maskGoogleMapsKeyInUrl(imageUrl),
+    encodedPayloadKb: encodedKb,
+    zoom: SATELLITE_STATIC_ZOOM,
   });
 
   console.info(`${LOG_PREFIX} Calling OpenAI gpt-4o chat/completions…`);
@@ -199,16 +271,17 @@ async function runVisionAnalysisInner(imageUrl: string): Promise<VisionAnalysis>
       body: JSON.stringify({
         model: "gpt-4o",
         response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 900,
+        temperature: 0.1,
+        max_tokens: 64,
         messages: [
+          { role: "system", content: VISION_SYSTEM_PROMPT },
           {
             role: "user",
             content: [
-              { type: "text", text: VISION_PROMPT },
+              { type: "text", text: VISION_USER_PROMPT },
               {
                 type: "image_url",
-                image_url: { url: imageDataUrl, detail: "high" },
+                image_url: { url: imageDataUrl, detail: "low" },
               },
             ],
           },

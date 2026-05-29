@@ -1,27 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env.server";
-import { clearLeadVisionAnalysis } from "@/lib/lead-vision";
-import { getGoogleMapsApiKey, mapsStaticSatelliteUrl, satelliteImageSrcForLead } from "@/lib/maps-static";
+import { clearLeadVisionAnalysis, isStoredAnalysisBlocked, needsVisionRerun } from "@/lib/lead-vision";
+import {
+  getGoogleMapsApiKey,
+  mapsStaticSatelliteUrl,
+  maskGoogleMapsKeyInUrl,
+  SATELLITE_STATIC_ZOOM,
+  satelliteImageSrcForLead,
+} from "@/lib/maps-static";
 import { calcQuoteRanges } from "@/lib/quote";
 import { getSettings, getSupabaseAdmin } from "@/lib/supabase";
-import { runVisionAnalysis, sendEmail } from "@/lib/integrations";
 import {
-  VISION_REFUSAL_MESSAGE,
-  VISION_TIMEOUT_MESSAGE,
-  VISION_UNABLE_MESSAGE,
-} from "@/lib/vision-constants";
+  detectCoordinateFallbackRegion,
+  visionAnalysisFromCoordinateFallback,
+} from "@/lib/regional-roof-estimate";
+import { runVisionAnalysis, sendEmail } from "@/lib/integrations";
+import { VISION_TIMEOUT_MESSAGE } from "@/lib/vision-constants";
 import {
   VisionAnalysisRefusalError,
   VisionAnalysisTimeoutError,
   VisionUnableToEstimateError,
 } from "@/lib/vision";
+import type { VisionAnalysis } from "@/lib/types";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const analyzeStartedAt = Date.now();
+  console.info("[vision/analyze] === ANALYZE POST called ===", {
+    at: new Date(analyzeStartedAt).toISOString(),
+    url: req.nextUrl.pathname + req.nextUrl.search,
+  });
+
   ensureEnvLoaded();
+
+  let leadId: number | null = null;
 
   try {
     const { id } = await params;
-    const leadId = Number(id);
+    leadId = Number(id);
     if (!Number.isFinite(leadId)) {
       return NextResponse.json({ error: "Invalid lead id" }, { status: 400 });
     }
@@ -35,8 +50,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    if (force && lead.roof_sqft != null) {
-      console.info(`[vision/analyze] lead ${leadId} force=true — clearing cached vision`);
+    const rerun = needsVisionRerun(lead, force);
+
+    if (rerun && (lead.roof_sqft != null || lead.vision_analysis_raw)) {
+      console.info(`[vision/analyze] lead ${leadId} clearing stale analysis`, {
+        force,
+        roof_sqft: lead.roof_sqft,
+        blocked: isStoredAnalysisBlocked(lead),
+      });
       await clearLeadVisionAnalysis(supabase, leadId);
       const refetch = await supabase.from("leads").select("*").eq("id", leadId).single();
       lead = refetch.data;
@@ -46,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    if (lead.roof_sqft != null) {
+    if (lead.roof_sqft != null && !isStoredAnalysisBlocked(lead)) {
       console.info(`[vision/analyze] lead ${leadId} already analyzed — roof_sqft=${lead.roof_sqft} (skipping GPT-4o)`);
       return NextResponse.json({
         cached: true,
@@ -72,9 +93,61 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       latitude: lead.latitude,
       longitude: lead.longitude,
       force,
+      satelliteZoom: SATELLITE_STATIC_ZOOM,
+      satelliteUrl: maskGoogleMapsKeyInUrl(staticUrlForVision),
     });
-    const analysis = await runVisionAnalysis(staticUrlForVision);
+    let analysis: VisionAnalysis;
+    let analysisSource = "gpt4o_vision";
+
+    try {
+      analysis = await runVisionAnalysis(staticUrlForVision);
+    } catch (visionError) {
+      const fallbackRegion = detectCoordinateFallbackRegion(
+        lead.latitude,
+        lead.longitude,
+        lead.address,
+        lead.country_code,
+      );
+      const visionFailed =
+        visionError instanceof VisionAnalysisRefusalError ||
+        visionError instanceof VisionUnableToEstimateError;
+
+      console.warn(`[vision/analyze] lead ${leadId} GPT-4o failed`, {
+        errorType: visionError instanceof Error ? visionError.name : "unknown",
+        visionFailed,
+        fallbackRegion,
+        country_code: lead.country_code,
+        address: lead.address,
+      });
+
+      if (visionFailed && fallbackRegion) {
+        const reason =
+          visionError instanceof VisionAnalysisRefusalError
+            ? visionError.refusal || visionError.message
+            : visionError.cause || visionError.message;
+        console.warn(
+          `[vision/analyze] lead ${leadId} using ${fallbackRegion} coordinate fallback (not returning blocked)`,
+          { reason },
+        );
+        analysis = visionAnalysisFromCoordinateFallback(
+          lead.latitude,
+          lead.longitude,
+          lead.address,
+          lead.country_code,
+          reason,
+        );
+        analysisSource = `${fallbackRegion}_coordinate_fallback`;
+      } else {
+        console.error(`[vision/analyze] lead ${leadId} rethrowing — no coordinate fallback`, {
+          fallbackRegion,
+          visionFailed,
+        });
+        throw visionError;
+      }
+    }
+
     console.info(`[vision/analyze] lead ${leadId} analysis done`, {
+      source: analysisSource,
       roof_sqft: analysis.roof_sqft,
       roof_type: analysis.roof_type,
       confidence: analysis.confidence,
@@ -89,7 +162,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         roof_complexity: analysis.complexity,
         vision_confidence: analysis.confidence,
         polygon_coordinates: analysis.polygon_coordinates,
-        vision_analysis_raw: JSON.stringify(analysis),
+        vision_analysis_raw: JSON.stringify({ ...analysis, analysis_source: analysisSource }),
         ...quotes,
         status: "quoted",
       })
@@ -116,7 +189,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
     }
 
-    return NextResponse.json({ lead: leadWithImage, cached: false });
+    return NextResponse.json({ lead: leadWithImage, cached: false, analysis_source: analysisSource });
   } catch (error) {
     if (error instanceof VisionAnalysisTimeoutError) {
       return NextResponse.json(
@@ -126,11 +199,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     if (error instanceof VisionAnalysisRefusalError) {
+      console.error("[vision/analyze] === returning 422 VISION_REFUSAL (analysis blocked) ===", {
+        leadId,
+        refusal: error.refusal,
+        elapsedMs: Date.now() - analyzeStartedAt,
+      });
       return NextResponse.json(
         {
           error: error.message,
           code: error.code,
-          userMessage: VISION_REFUSAL_MESSAGE,
           refusal: error.refusal,
         },
         { status: 422 },
@@ -138,11 +215,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     if (error instanceof VisionUnableToEstimateError) {
+      console.error("[vision/analyze] === returning 422 VISION_UNABLE ===", {
+        leadId,
+        cause: error.cause,
+        elapsedMs: Date.now() - analyzeStartedAt,
+      });
       return NextResponse.json(
         {
           error: error.message,
           code: error.code,
-          userMessage: VISION_UNABLE_MESSAGE,
           cause: error.cause,
         },
         { status: 422 },

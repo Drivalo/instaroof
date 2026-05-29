@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  estimateRoofSqftFromAddress,
   estimateRoofSqftFromCoordinates,
   formatRoofAreaDisplay,
   previewMaterialForRegion,
@@ -33,19 +34,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    const hasCoords =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      !(latitude === 0 && longitude === 0);
+
+    let roof_sqft = 0;
+    let source: "coordinates" | "address" = "address";
+
+    if (hasCoords) {
+      roof_sqft = estimateRoofSqftFromCoordinates(latitude, longitude);
+      source = "coordinates";
+    } else if (address.trim()) {
+      roof_sqft = estimateRoofSqftFromAddress(address);
+      source = "address";
+    } else {
       return NextResponse.json(
-        { error: "latitude and longitude are required for a roof size estimate" },
+        { error: "Enter an address or select one from the dropdown" },
         { status: 400 },
       );
     }
 
-    const roof_sqft = estimateRoofSqftFromCoordinates(latitude, longitude);
     const area = formatRoofAreaDisplay(roof_sqft, address, countryCode);
 
     return NextResponse.json({
       roof_sqft,
-      source: "coordinates",
+      source,
       area,
       material: previewMaterialForRegion(address, countryCode),
       price_range: previewPriceRangeFromEstimate(roof_sqft, address, settings, countryCode),

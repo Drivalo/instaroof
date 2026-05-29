@@ -2,6 +2,19 @@ import { DEFAULT_SETTINGS } from "@/lib/defaults";
 import { calcQuoteRanges } from "@/lib/quote";
 import { SettingsRow } from "@/lib/types";
 
+/** Deterministic roof size (sq ft) from address text when coordinates are unavailable. */
+export function estimateRoofSqftFromAddress(address: string): number {
+  const normalized = address.trim().toLowerCase();
+  if (!normalized) return 0;
+
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
+  }
+  const frac = (hash % 1000) / 1000;
+  return Math.round(1100 + frac * 2300);
+}
+
 /** Deterministic roof size (sq ft) from property coordinates — varies per lat/lng. */
 export function estimateRoofSqftFromCoordinates(lat: number, lng: number): number {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 0;

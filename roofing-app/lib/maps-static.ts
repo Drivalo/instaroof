@@ -6,12 +6,19 @@ export function getGoogleMapsApiKey(override?: string | null): string | undefine
   return readEnv("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY");
 }
 
+/** Max practical zoom for roof detail on Google Static Maps (closer than 20). */
+export const SATELLITE_STATIC_ZOOM = 21;
+
+export function maskGoogleMapsKeyInUrl(url: string) {
+  return url.replace(/key=[^&]+/, "key=***");
+}
+
 /** Google Static Maps satellite image URL (server-side fetch / vision). */
 export function mapsStaticSatelliteUrl(lat: number, lng: number, googleMapsApiKey?: string | null) {
   const apiKey = getGoogleMapsApiKey(googleMapsApiKey);
   const params = new URLSearchParams({
     center: `${lat},${lng}`,
-    zoom: "20",
+    zoom: String(SATELLITE_STATIC_ZOOM),
     size: "600x600",
     scale: "2",
     maptype: "satellite",
