@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { addDays, format } from "date-fns";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SettingsRow } from "@/lib/types";
 
 const contactFieldClass =
@@ -14,6 +14,9 @@ const contactFieldClass =
 const slotButtonBase =
   "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
 const slotButtonSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
+
+const BOOKING_MODAL_DELAY_MS = 5000;
+const BOOKING_MODAL_SCROLL_PX = 280;
 
 function isValidEmail(value: string) {
   const trimmed = value.trim();
@@ -133,7 +136,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingContact, setSavingContact] = useState(false);
   const [satelliteReady, setSatelliteReady] = useState(false);
   const [detailsUnlocked, setDetailsUnlocked] = useState(false);
-  const [bookingModalRequested, setBookingModalRequested] = useState(false);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [scheduleBookingPrompt, setScheduleBookingPrompt] = useState(false);
+  const bookingPromptHandledRef = useRef(false);
   const [availability, setAvailability] = useState<any[]>([]);
   const [inspectionSlot, setInspectionSlot] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -228,16 +233,25 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
+  const openBookingModal = useCallback((source: "button" | "timer" | "scroll") => {
+    if (bookingPromptHandledRef.current) return;
+    bookingPromptHandledRef.current = true;
+    setScheduleBookingPrompt(false);
+    setBookingModalOpen(true);
+    console.info("[quote] showBookingModal set to true", { source });
+  }, []);
+
   async function handleSeeMyQuote() {
     const saved = await saveContactDetails();
     if (saved) {
-      setBookingModalRequested(true);
-      console.info("[quote] first modal submitted — showBookingModal set to true", {
-        bookingModalRequested: true,
+      bookingPromptHandledRef.current = false;
+      setScheduleBookingPrompt(true);
+      console.info("[quote] first modal closed — quote revealed, booking prompt scheduled", {
         detailsUnlocked: true,
+        delayMs: BOOKING_MODAL_DELAY_MS,
       });
     } else {
-      console.warn("[quote] first modal submit failed — booking modal not opened");
+      console.warn("[quote] first modal submit failed");
     }
   }
 
@@ -288,15 +302,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  async function continueToBooking() {
-    const name = contact.name.trim();
-    const email = contact.email.trim();
-    const phone = contact.phone.trim();
-
-    const saved = await saveContactDetails();
-    if (saved) router.push(`/book/${id}`);
-  }
-
   const polygonPoints = useMemo(() => {
     const raw = lead?.polygon_coordinates;
     if (!Array.isArray(raw)) return "";
@@ -323,15 +328,16 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   }, [satelliteSrc]);
 
   const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
-  const showBookingModal = bookingModalRequested && detailsUnlocked && hasQuoteEstimates;
-  const showInlineBooking = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
+  const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
+  const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
 
   useEffect(() => {
     console.info("[quote] modal state", {
       showDetailsModal,
       showBookingModal,
       detailsUnlocked,
-      bookingModalRequested,
+      scheduleBookingPrompt,
+      bookingModalOpen,
       hasQuoteEstimates,
       satelliteReady,
     });
@@ -339,10 +345,33 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     showDetailsModal,
     showBookingModal,
     detailsUnlocked,
-    bookingModalRequested,
+    scheduleBookingPrompt,
+    bookingModalOpen,
     hasQuoteEstimates,
     satelliteReady,
   ]);
+
+  useEffect(() => {
+    if (!scheduleBookingPrompt || !detailsUnlocked || !hasQuoteEstimates) return;
+
+    const timer = window.setTimeout(() => {
+      openBookingModal("timer");
+    }, BOOKING_MODAL_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [scheduleBookingPrompt, detailsUnlocked, hasQuoteEstimates, openBookingModal]);
+
+  useEffect(() => {
+    if (!scheduleBookingPrompt || !detailsUnlocked || bookingModalOpen) return;
+
+    const onScroll = () => {
+      if (window.scrollY < BOOKING_MODAL_SCROLL_PX) return;
+      openBookingModal("scroll");
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [scheduleBookingPrompt, detailsUnlocked, bookingModalOpen, openBookingModal]);
 
   useEffect(() => {
     const lockScroll = showDetailsModal || showBookingModal;
@@ -483,11 +512,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div
-        className={
-          showDetailsModal || showBookingModal ? "pointer-events-none select-none blur-sm" : undefined
-        }
-      >
+      <div className={showDetailsModal ? "pointer-events-none select-none blur-sm" : undefined}>
       <div className="relative w-full max-w-[600px]">
         {satelliteSrc ? (
           <Image
@@ -610,9 +635,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {hasQuoteEstimates && (
+      {hasQuoteEstimates && !detailsUnlocked && (
         <p className="mt-3 text-sm text-muted leading-relaxed">
-          Final price confirmed at your free inspection. Book with no obligation.
+          Enter your details above to view your full price breakdown.
         </p>
       )}
 
@@ -629,76 +654,22 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </Link>
       )}
 
-      {showInlineBooking && (
-        <>
-          <section className="mt-8 max-w-md rounded-lg border border-border-subtle bg-surface p-6">
-            <h2 className="text-lg text-foreground">Your details</h2>
-            <p className="mt-1 text-sm text-muted">Update if needed before booking your free inspection.</p>
-            <div className="mt-5 space-y-4">
-              <div>
-                <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
-                  Name
-                </label>
-                <input
-                  id="quote-name"
-                  type="text"
-                  required
-                  autoComplete="name"
-                  className={contactFieldClass}
-                  placeholder="Your full name"
-                  value={contact.name}
-                  onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label htmlFor="quote-email" className="block text-sm text-muted mb-1.5">
-                  Email
-                </label>
-                <input
-                  id="quote-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  className={contactFieldClass}
-                  placeholder="Email"
-                  value={contact.email}
-                  onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label htmlFor="quote-phone" className="block text-sm text-muted mb-1.5">
-                  Phone number
-                </label>
-                <input
-                  id="quote-phone"
-                  type="tel"
-                  required
-                  autoComplete="tel"
-                  className={contactFieldClass}
-                  placeholder="Phone number"
-                  value={contact.phone}
-                  onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                />
-              </div>
-            </div>
-          </section>
-
+      {showBookInspectionCta && (
+        <div className="mt-8 max-w-md">
+          <p className="text-sm text-muted leading-relaxed">
+            Final price is confirmed at your free inspection. Book with no obligation.
+          </p>
           <button
             type="button"
-            onClick={continueToBooking}
-            disabled={!contactReady || savingContact}
-            className="mt-6 btn-accent rounded-xl px-6 py-4 tracking-wide disabled:opacity-50"
+            onClick={() => openBookingModal("button")}
+            className="mt-4 w-full md:w-auto btn-accent rounded-lg px-8 py-3.5 text-sm tracking-wide"
           >
-            {savingContact
-              ? "Saving…"
-              : `Lock In Your Quote - Book Free Inspection (${formatDepositPrice(
-                  Number(settings?.deposit_amount ?? 50),
-                  customerAddress,
-                  settings,
-                  customerCountry,
-                )} Refundable Deposit)`}
+            Book your free inspection
           </button>
-        </>
+          <p className="mt-2 text-xs text-muted">
+            Refundable deposit: {depositLabel}
+          </p>
+        </div>
       )}
       </div>
     </main>
