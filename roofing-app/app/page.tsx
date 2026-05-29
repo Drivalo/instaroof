@@ -46,16 +46,8 @@ export default function Home() {
       .catch((err) => console.error("bootstrap load failed:", err));
   }, []);
 
-  const brand = useMemo(
-    () =>
-      bootstrap?.settings ?? {
-        company_name: "Acme Roofing",
-        company_logo_url: null,
-        primary_color: "#C8102E",
-        secondary_color: "#1F2937",
-      },
-    [bootstrap],
-  );
+  const companyName = bootstrap?.settings?.company_name ?? "Acme Roofing";
+  const companyLogo = bootstrap?.settings?.company_logo_url;
 
   useEffect(() => {
     if (!mockQuoteVisible || !previewSectionRef.current) return;
@@ -208,137 +200,172 @@ export default function Home() {
     }
   }
 
+  const defaultTestimonials = useMemo(
+    () => [
+      { id: 1, name: "Sarah J.", location: "Austin, TX", quote_text: "Fast and accurate quote — booked in minutes.", rating: 5 },
+      { id: 2, name: "Mike R.", location: "Dallas, TX", quote_text: "Loved seeing the estimate instantly.", rating: 5 },
+      { id: 3, name: "Priya K.", location: "Houston, TX", quote_text: "Simple, clear, and straightforward.", rating: 5 },
+    ],
+    [],
+  );
+
+  const testimonials = bootstrap?.testimonials?.length ? bootstrap.testimonials : defaultTestimonials;
+
   return (
-    <main className="pb-16">
-      <section className="bg-white border-b border-zinc-200">
-        <div className="container-max py-12 md:py-20">
-          {brand.company_logo_url ? (
+    <main className="min-h-screen bg-[#F8F6F2] text-[#1C1C1C] pb-24">
+      {/* Hero */}
+      <section className="pt-14 md:pt-20 pb-16 md:pb-24">
+        <div className="container-max">
+          {companyLogo ? (
             <Image
-              src={brand.company_logo_url}
-              alt={`${brand.company_name} logo`}
-              width={220}
-              height={56}
+              src={companyLogo}
+              alt={`${companyName} logo`}
+              width={200}
+              height={48}
               unoptimized
-              className="h-14 w-auto mb-6"
+              className="h-10 w-auto mb-10 md:mb-14"
             />
           ) : null}
-          <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-            Get Your Roof Quote in 60 Seconds - No Salesperson, No Phone Call
+
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-[3.25rem] leading-[1.15] tracking-tight max-w-2xl">
+            Get your roof quote in 60 seconds
           </h1>
-          <p className="text-lg text-zinc-700 mt-4">
-            AI-powered satellite analysis gives you a real quote instantly. Book your free inspection with $50 fully-refundable deposit.
+          <p className="mt-5 text-lg md:text-xl text-[#6B6B6B] max-w-xl leading-relaxed">
+            See your price. Decide when you&apos;re ready.
           </p>
-          <div className="mt-8 grid gap-3 md:grid-cols-[1fr_auto]">
-            <AddressAutocomplete
-              ref={addressInputRef}
-              className="w-full rounded-xl border border-zinc-300 p-4"
-              placeholder="Enter your property address"
-              onAddressChange={(value) => {
-                setAddress(value);
-                setPlaceDetails(null);
-              }}
-              onPlaceSelected={setPlaceDetails}
-            />
+
+          <div className="mt-10 md:mt-12 max-w-2xl">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <AddressAutocomplete
+                ref={addressInputRef}
+                className="flex-1 w-full rounded-lg border border-[#E8E4DC] bg-white px-4 py-3.5 text-[#1C1C1C] placeholder:text-[#6B6B6B]/70 focus:outline-none focus:border-[#C9A96E] transition-colors"
+                placeholder="Enter your property address"
+                onAddressChange={(value) => {
+                  setAddress(value);
+                  setPlaceDetails(null);
+                }}
+                onPlaceSelected={setPlaceDetails}
+              />
+              <button
+                type="button"
+                onClick={createLead}
+                disabled={loadingPreview}
+                className="relative z-10 btn-accent shrink-0 rounded-lg px-8 py-3.5 text-sm font-medium tracking-wide"
+              >
+                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
+              </button>
+            </div>
+
             {!hasGoogleMapsKey() && (
-              <p className="text-sm text-amber-700 md:col-span-2">
+              <p className="mt-3 text-sm text-[#6B6B6B]">
                 Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to roofing-app/.env.local and restart the dev server.
               </p>
             )}
-            <button
-              type="button"
-              onClick={createLead}
-              disabled={loadingPreview}
-              className="relative z-10 rounded-xl px-6 py-4 font-semibold text-white shrink-0 disabled:opacity-50"
-              style={{ background: brand.primary_color }}
-            >
-              {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
-            </button>
-          </div>
-          <input
-            className="mt-3 w-full rounded-xl border border-zinc-300 p-3 md:w-96"
-            placeholder="Email (optional for quote follow-up)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <div className="grid md:grid-cols-3 gap-3 mt-8 text-sm">
-            <p className="rounded-lg bg-zinc-100 p-3">Used by 1,200+ homeowners</p>
-            <p className="rounded-lg bg-zinc-100 p-3">Licensed & Insured</p>
-            <p className="rounded-lg bg-zinc-100 p-3">$50 deposit fully refunded at inspection</p>
+
+            <input
+              className="mt-4 w-full sm:max-w-md rounded-lg border border-[#E8E4DC] bg-white px-4 py-3 text-[#1C1C1C] placeholder:text-[#6B6B6B]/70 focus:outline-none focus:border-[#C9A96E] transition-colors"
+              placeholder="Email (optional)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
         </div>
       </section>
 
+      {/* Preview quote */}
       {mockQuoteVisible && (
-        <section ref={previewSectionRef} className="container-max py-8">
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="text-2xl font-bold">Your Instant Quote</h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <p className="rounded-lg bg-zinc-100 p-3">
-                Estimated roof size:{" "}
-                <strong>
-                  {loadingPreview
-                    ? "Calculating…"
-                    : previewRoofLabel ?? "—"}
-                </strong>
-              </p>
-              <p className="rounded-lg bg-zinc-100 p-3">
-                Price range:{" "}
-                <strong>{loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}</strong>
-              </p>
-              <p className="rounded-lg bg-zinc-100 p-3">
-                Recommended material:{" "}
-                <strong>{loadingPreview ? "…" : previewMaterial ?? "—"}</strong>
-              </p>
-            </div>
-            {!loadingPreview && previewRoofLabel && (
-              <p className="mt-2 text-xs text-zinc-500">
-                Quick estimate from your property location. Full AI satellite analysis refines this after you continue.
-              </p>
-            )}
-            <div className="mt-4">
+        <section ref={previewSectionRef} className="pb-16 md:pb-20">
+          <div className="container-max">
+            <div className="rounded-lg border border-[#E8E4DC] bg-white p-8 md:p-10">
+              <p className="text-xs uppercase tracking-[0.2em] text-[#C9A96E] font-medium">Your estimate</p>
+              <h2 className="font-serif text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-[#E8E4DC] bg-[#F8F6F2] px-5 py-4">
+                  <p className="text-sm text-[#6B6B6B]">Estimated roof size</p>
+                  <p className="mt-1 text-lg font-medium text-[#1C1C1C]">
+                    {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[#E8E4DC] bg-[#F8F6F2] px-5 py-4">
+                  <p className="text-sm text-[#6B6B6B]">Price range</p>
+                  <p className="mt-1 text-lg font-medium text-[#1C1C1C]">
+                    {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[#E8E4DC] bg-[#F8F6F2] px-5 py-4">
+                  <p className="text-sm text-[#6B6B6B]">Recommended material</p>
+                  <p className="mt-1 text-lg font-medium text-[#1C1C1C]">
+                    {loadingPreview ? "…" : previewMaterial ?? "—"}
+                  </p>
+                </div>
+              </div>
+
+              {!loadingPreview && previewRoofLabel && (
+                <p className="mt-6 text-sm text-[#6B6B6B] leading-relaxed">
+                  A quick estimate from your property location. Full satellite analysis refines your quote when you continue.
+                </p>
+              )}
+
               <button
                 type="button"
                 onClick={createRealLead}
                 disabled={loadingAnalysis || loadingPreview || !previewRoofLabel}
-                className="rounded-lg bg-[#1F2937] px-4 py-2 text-white disabled:opacity-50"
+                className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm font-medium tracking-wide disabled:opacity-50"
               >
-                {loadingAnalysis ? "Starting analysis..." : "Continue with full AI analysis"}
+                {loadingAnalysis ? "Starting analysis…" : "Continue with full AI analysis"}
               </button>
             </div>
           </div>
         </section>
       )}
 
-      <section className="container-max py-12">
-        <h2 className="text-2xl font-semibold mb-4">How it works</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="rounded-xl bg-white border p-4">1. Enter your address</div>
-          <div className="rounded-xl bg-white border p-4">2. AI analyzes your roof from satellite</div>
-          <div className="rounded-xl bg-white border p-4">3. Get instant quote + book inspection</div>
+      {/* How it works */}
+      <section className="py-16 md:py-20 border-t border-[#E8E4DC]">
+        <div className="container-max">
+          <h2 className="font-serif text-2xl md:text-3xl">How it works</h2>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {[
+              { step: "01", text: "Enter your address" },
+              { step: "02", text: "We analyse your roof from satellite imagery" },
+              { step: "03", text: "Receive your quote instantly" },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="rounded-lg border border-[#E8E4DC] bg-white px-6 py-8"
+              >
+                <span className="text-sm text-[#C9A96E] font-medium tracking-widest">{item.step}</span>
+                <p className="mt-4 text-[#1C1C1C] leading-relaxed">{item.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="container-max py-8">
-        <h2 className="text-2xl font-semibold mb-4">What homeowners say</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          {(bootstrap?.testimonials?.length
-            ? bootstrap.testimonials
-            : [
-                { id: 1, name: "Sarah J.", location: "Austin, TX", quote_text: "Fast and accurate quote - booked in minutes.", rating: 5 },
-                { id: 2, name: "Mike R.", location: "Dallas, TX", quote_text: "Loved seeing the estimate instantly.", rating: 5 },
-                { id: 3, name: "Priya K.", location: "Houston, TX", quote_text: "Easy process and no sales pressure.", rating: 5 },
-              ]
-          ).map((t) => (
-            <article key={t.id} className="rounded-xl bg-white border p-4">
-              <p className="text-zinc-700">&quot;{t.quote_text}&quot;</p>
-              <p className="font-semibold mt-3">{t.name}</p>
-              <p className="text-sm text-zinc-500">{t.location}</p>
-            </article>
-          ))}
+      {/* Testimonials */}
+      <section className="py-16 md:py-20">
+        <div className="container-max">
+          <h2 className="font-serif text-2xl md:text-3xl">What homeowners say</h2>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {testimonials.map((t) => (
+              <article
+                key={t.id}
+                className="rounded-lg border border-[#E8E4DC] bg-white px-6 py-8 flex flex-col"
+              >
+                <p className="text-[#1C1C1C] leading-relaxed flex-1">&ldquo;{t.quote_text}&rdquo;</p>
+                <div className="mt-6 pt-6 border-t border-[#E8E4DC]">
+                  <p className="font-medium text-[#1C1C1C]">{t.name}</p>
+                  <p className="text-sm text-[#6B6B6B] mt-0.5">{t.location}</p>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <footer className="container-max py-6 text-sm text-zinc-600">Powered by InstaRoof Quote for {brand.company_name}</footer>
+      <footer className="container-max py-8 text-sm text-[#6B6B6B] border-t border-[#E8E4DC]">
+        Powered by InstaRoof Quote for {companyName}
+      </footer>
     </main>
   );
 }
