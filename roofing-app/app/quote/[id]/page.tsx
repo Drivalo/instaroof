@@ -2,10 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import Link from "next/link";
-import Image from "next/image";
 import { addDays, format } from "date-fns";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SatelliteRoofMap } from "@/components/satellite-roof-map";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SettingsRow } from "@/lib/types";
 
 const contactFieldClass =
@@ -14,9 +13,6 @@ const contactFieldClass =
 const slotButtonBase =
   "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
 const slotButtonSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
-
-const BOOKING_MODAL_DELAY_MS = 5000;
-const BOOKING_MODAL_SCROLL_PX = 280;
 
 function isValidEmail(value: string) {
   const trimmed = value.trim();
@@ -128,7 +124,6 @@ function formatDepositPrice(
 }
 
 export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
-  const router = useRouter();
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
   const [settings, setSettings] = useState<SettingsRow | null>(null);
@@ -137,8 +132,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [satelliteReady, setSatelliteReady] = useState(false);
   const [detailsUnlocked, setDetailsUnlocked] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
-  const [scheduleBookingPrompt, setScheduleBookingPrompt] = useState(false);
-  const bookingPromptHandledRef = useRef(false);
   const [availability, setAvailability] = useState<any[]>([]);
   const [inspectionSlot, setInspectionSlot] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -233,23 +226,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  const openBookingModal = useCallback((source: "button" | "timer" | "scroll") => {
-    if (bookingPromptHandledRef.current) return;
-    bookingPromptHandledRef.current = true;
-    setScheduleBookingPrompt(false);
+  const openBookingModal = useCallback(() => {
     setBookingModalOpen(true);
-    console.info("[quote] showBookingModal set to true", { source });
+    console.info("[quote] showBookingModal set to true", { source: "button" });
   }, []);
 
   async function handleSeeMyQuote() {
     const saved = await saveContactDetails();
     if (saved) {
-      bookingPromptHandledRef.current = false;
-      setScheduleBookingPrompt(true);
-      console.info("[quote] first modal closed — quote revealed, booking prompt scheduled", {
-        detailsUnlocked: true,
-        delayMs: BOOKING_MODAL_DELAY_MS,
-      });
+      console.info("[quote] first modal closed — quote revealed");
     } else {
       console.warn("[quote] first modal submit failed");
     }
@@ -302,12 +287,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  const polygonPoints = useMemo(() => {
-    const raw = lead?.polygon_coordinates;
-    if (!Array.isArray(raw)) return "";
-    return raw.map((p: { x?: number; y?: number }) => `${p.x ?? 0},${p.y ?? 0}`).join(" ");
-  }, [lead?.polygon_coordinates]);
-
   const hasQuoteEstimates = useMemo(() => {
     if (!lead) return false;
     const fields = [
@@ -330,48 +309,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
   const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
   const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
-
-  useEffect(() => {
-    console.info("[quote] modal state", {
-      showDetailsModal,
-      showBookingModal,
-      detailsUnlocked,
-      scheduleBookingPrompt,
-      bookingModalOpen,
-      hasQuoteEstimates,
-      satelliteReady,
-    });
-  }, [
-    showDetailsModal,
-    showBookingModal,
-    detailsUnlocked,
-    scheduleBookingPrompt,
-    bookingModalOpen,
-    hasQuoteEstimates,
-    satelliteReady,
-  ]);
-
-  useEffect(() => {
-    if (!scheduleBookingPrompt || !detailsUnlocked || !hasQuoteEstimates) return;
-
-    const timer = window.setTimeout(() => {
-      openBookingModal("timer");
-    }, BOOKING_MODAL_DELAY_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [scheduleBookingPrompt, detailsUnlocked, hasQuoteEstimates, openBookingModal]);
-
-  useEffect(() => {
-    if (!scheduleBookingPrompt || !detailsUnlocked || bookingModalOpen) return;
-
-    const onScroll = () => {
-      if (window.scrollY < BOOKING_MODAL_SCROLL_PX) return;
-      openBookingModal("scroll");
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [scheduleBookingPrompt, detailsUnlocked, bookingModalOpen, openBookingModal]);
 
   useEffect(() => {
     const lockScroll = showDetailsModal || showBookingModal;
@@ -512,34 +449,32 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div className="relative w-full max-w-[600px]">
-        {satelliteSrc ? (
-          <Image
-            src={satelliteSrc}
-            alt="Satellite"
-            width={600}
-            height={600}
-            unoptimized
-            className="w-full h-auto rounded-xl border border-border-subtle"
-            onLoad={() => setSatelliteReady(true)}
-            onError={() => setSatelliteReady(true)}
-          />
-        ) : (
-          <div className="flex h-[300px] md:h-[400px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
-            Satellite image unavailable
-          </div>
-        )}
-        {polygonPoints ? (
-          <svg viewBox="0 0 600 600" className="absolute inset-0 w-full h-full pointer-events-none">
-            <polygon
-              points={polygonPoints}
-              fill="none"
-              stroke="#C9A96E"
-              strokeWidth="3"
-            />
-          </svg>
-        ) : null}
-      </div>
+      {showBookInspectionCta && (
+        <section className="mb-8 w-full max-w-2xl">
+          <button
+            type="button"
+            onClick={openBookingModal}
+            className="w-full rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+          >
+            Book your free inspection
+          </button>
+          <p className="mt-3 text-center text-sm text-muted">
+            Final price confirmed on site. No obligation.
+          </p>
+        </section>
+      )}
+
+      {satelliteSrc ? (
+        <SatelliteRoofMap
+          src={satelliteSrc}
+          polygonCoordinates={lead.polygon_coordinates}
+          onImageReady={() => setSatelliteReady(true)}
+        />
+      ) : (
+        <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
+          Satellite image unavailable
+        </div>
+      )}
 
       <p className="mt-4 text-sm text-muted">
         Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
@@ -653,23 +588,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </Link>
       )}
 
-      {showBookInspectionCta && (
-        <div className="mt-8 max-w-md">
-          <p className="text-sm text-muted leading-relaxed">
-            Final price is confirmed at your free inspection. Book with no obligation.
-          </p>
-          <button
-            type="button"
-            onClick={() => openBookingModal("button")}
-            className="mt-4 w-full md:w-auto btn-accent rounded-lg px-8 py-3.5 text-sm tracking-wide"
-          >
-            Book your free inspection
-          </button>
-          <p className="mt-2 text-xs text-muted">
-            Refundable deposit: {depositLabel}
-          </p>
-        </div>
-      )}
     </main>
   );
 }
