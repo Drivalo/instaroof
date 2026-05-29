@@ -210,33 +210,62 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
+  const polygonPoints = useMemo(() => {
+    const raw = lead?.polygon_coordinates;
+    if (!Array.isArray(raw)) return "";
+    return raw.map((p: { x?: number; y?: number }) => `${p.x ?? 0},${p.y ?? 0}`).join(" ");
+  }, [lead?.polygon_coordinates]);
+
+  const hasQuoteEstimates = useMemo(() => {
+    if (!lead) return false;
+    const fields = [
+      lead.quote_repair_low,
+      lead.quote_repair_high,
+      lead.quote_standard_low,
+      lead.quote_standard_high,
+      lead.quote_premium_low,
+      lead.quote_premium_high,
+    ];
+    return fields.some((v) => v != null && Number(v) > 0);
+  }, [lead]);
+
   if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
+
+  const satelliteSrc = String(lead.satellite_image_url ?? "").trim();
 
   return (
     <main className="customer-page container-max py-8">
       <div className="relative w-full max-w-[600px]">
-        <Image
-          src={lead.satellite_image_url}
-          alt="Satellite"
-          width={600}
-          height={600}
-          unoptimized
-          className="w-full h-auto rounded-xl border"
-        />
-        <svg viewBox="0 0 600 600" className="absolute inset-0 w-full h-full">
-          <polygon
-            points={(lead.polygon_coordinates || []).map((p: any) => `${p.x},${p.y}`).join(" ")}
-            fill="rgba(200, 16, 46, 0.35)"
-            stroke="rgba(200,16,46,0.9)"
-            strokeWidth="3"
+        {satelliteSrc ? (
+          <Image
+            src={satelliteSrc}
+            alt="Satellite"
+            width={600}
+            height={600}
+            unoptimized
+            className="w-full h-auto rounded-xl border border-border-subtle"
           />
-        </svg>
+        ) : (
+          <div className="flex h-[300px] md:h-[400px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
+            Satellite image unavailable
+          </div>
+        )}
+        {polygonPoints ? (
+          <svg viewBox="0 0 600 600" className="absolute inset-0 w-full h-full pointer-events-none">
+            <polygon
+              points={polygonPoints}
+              fill="rgba(245, 166, 35, 0.35)"
+              stroke="rgba(245, 166, 35, 0.9)"
+              strokeWidth="3"
+            />
+          </svg>
+        ) : null}
       </div>
 
-      <p className="mt-4 text-sm text-zinc-600">
-        Property: <strong>{customerAddress || "Address not saved"}</strong>
+      <p className="mt-4 text-sm text-muted">
+        Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
       </p>
-      <p className="mt-1 text-sm text-zinc-500">
+      <p className="mt-1 text-sm text-muted">
         Currency detected:{" "}
         <strong>
           {quoteCurrency === "GB"
@@ -251,64 +280,82 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       </p>
 
       <div className="grid md:grid-cols-2 gap-3 mt-4">
-        <p className="rounded-lg bg-white border p-3">Estimated roof area: <strong>{lead.roof_sqft} sq ft</strong></p>
-        <p className="rounded-lg bg-white border p-3">Estimated squares: <strong>{squares}</strong></p>
-        <p className="rounded-lg bg-white border p-3">Detected roof type: <strong>{lead.roof_type}</strong></p>
-        <p className="rounded-lg bg-white border p-3">Complexity: <strong>{lead.roof_complexity}</strong></p>
+        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+          Estimated roof area: <strong>{lead.roof_sqft ?? "—"} sq ft</strong>
+        </p>
+        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+          Estimated squares: <strong>{squares}</strong>
+        </p>
+        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+          Detected roof type: <strong>{lead.roof_type ?? "—"}</strong>
+        </p>
+        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+          Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
+        </p>
       </div>
 
-      {lead.vision_confidence < 50 && (
+      {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
         <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
           Your roof has complex features - your final quote may vary significantly from this estimate.
         </p>
       )}
 
-      <div className="grid md:grid-cols-3 gap-4 mt-6">
-        <div className="rounded-xl border bg-white p-4">
-          <h3>Repair Estimate</h3>
-          <p className="text-2xl mt-2">
-            {(() => {
-              const low = Number(lead.quote_repair_low) || 0;
-              const high = Number(lead.quote_repair_high) || 0;
-              const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-              if (customerAddress.endsWith("UK") || customerAddress.includes(", UK")) {
-                return `£${fmt(low * 0.79)} - £${fmt(high * 0.79)}`;
-              }
-              return `$${fmt(low)} - $${fmt(high)}`;
-            })()}
+      {!hasQuoteEstimates ? (
+        <div className="mt-6 rounded-lg border border-border-subtle bg-surface p-6 text-foreground">
+          <p className="text-muted">
+            Cost estimates are not available yet. Analysis may still be in progress or did not complete.
           </p>
+          {lead.latitude != null && lead.longitude != null && (
+            <Link
+              href={`/analyzing?leadId=${id}&lat=${lead.latitude}&lng=${lead.longitude}&force=true`}
+              className="mt-3 inline-block text-sm text-accent underline"
+            >
+              Re-run roof analysis
+            </Link>
+          )}
         </div>
-        <div className="rounded-xl border bg-white p-4">
-          <h3>Full Replacement - Standard</h3>
-          <p className="text-2xl mt-2">
-            {(() => {
-              const low = Number(lead.quote_standard_low) || 0;
-              const high = Number(lead.quote_standard_high) || 0;
-              const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-              if (customerAddress.endsWith("UK") || customerAddress.includes(", UK")) {
-                return `£${fmt(low * 0.79)} - £${fmt(high * 0.79)}`;
-              }
-              return `$${fmt(low)} - $${fmt(high)}`;
-            })()}
-          </p>
+      ) : (
+        <div className="grid md:grid-cols-3 gap-4 mt-6">
+          <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
+            <h3>Repair Estimate</h3>
+            <p className="text-2xl mt-2 text-foreground">
+              {formatQuotePriceRange(
+                lead.quote_repair_low,
+                lead.quote_repair_high,
+                customerAddress,
+                settings,
+                customerCountry,
+              )}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
+            <h3>Full Replacement - Standard</h3>
+            <p className="text-2xl mt-2 text-foreground">
+              {formatQuotePriceRange(
+                lead.quote_standard_low,
+                lead.quote_standard_high,
+                customerAddress,
+                settings,
+                customerCountry,
+              )}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
+            <h3>Full Replacement - Premium</h3>
+            <p className="text-2xl mt-2 text-foreground">
+              {formatQuotePriceRange(
+                lead.quote_premium_low,
+                lead.quote_premium_high,
+                customerAddress,
+                settings,
+                customerCountry,
+              )}
+            </p>
+          </div>
         </div>
-        <div className="rounded-xl border bg-white p-4">
-          <h3>Full Replacement - Premium</h3>
-          <p className="text-2xl mt-2">
-            {(() => {
-              const low = Number(lead.quote_premium_low) || 0;
-              const high = Number(lead.quote_premium_high) || 0;
-              const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-              if (customerAddress.endsWith("UK") || customerAddress.includes(", UK")) {
-                return `£${fmt(low * 0.79)} - £${fmt(high * 0.79)}`;
-              }
-              return `$${fmt(low)} - $${fmt(high)}`;
-            })()}
-          </p>
-        </div>
-      </div>
+      )}
 
-      <p className="mt-3 text-sm text-zinc-600">
+      <p className="mt-3 text-sm text-muted">
         Estimate based on AI satellite analysis. Final pricing confirmed at free in-person inspection.
       </p>
 
@@ -381,14 +428,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       >
         {savingContact
           ? "Saving…"
-          : `Lock In Your Quote - Book Free Inspection (${(() => {
-              const usd = Number(settings?.deposit_amount ?? 50);
-              const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-              if (customerAddress.endsWith("UK") || customerAddress.includes(", UK")) {
-                return `£${fmt(usd * 0.79)}`;
-              }
-              return `$${fmt(usd)}`;
-            })()} Refundable Deposit)`}
+          : `Lock In Your Quote - Book Free Inspection (${formatDepositPrice(
+              Number(settings?.deposit_amount ?? 50),
+              customerAddress,
+              settings,
+              customerCountry,
+            )} Refundable Deposit)`}
       </button>
     </main>
   );
