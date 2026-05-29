@@ -36,6 +36,13 @@ body {
   font-weight: 500;
 }
 
+.hero-headline {
+  font-family: var(--font-jost), system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .container-max {
   max-width: 1080px;
   margin: 0 auto;
