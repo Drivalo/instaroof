@@ -1,56 +1,49 @@
-/** ISO 3166-1 alpha-2 (lowercase) from a BCP 47 locale tag, e.g. en-AU → au */
-export function countryFromLocaleTag(tag: string): string | null {
-  const trimmed = tag.trim();
-  if (!trimmed) return null;
+import { resolveSupportedCountry, type SupportedCountryCode } from "@/lib/supported-countries";
 
-  try {
-    const locale = new Intl.Locale(trimmed);
-    const region = locale.region;
-    if (region && /^[A-Z]{2}$/i.test(region)) {
-      return region.toLowerCase();
-    }
-  } catch {
-    const match = trimmed.match(/[-_]([A-Za-z]{2})$/);
-    if (match) return match[1].toLowerCase();
-  }
-
-  return null;
-}
-
-/** Browser locale / language preferences (client only). */
-export function countryFromBrowserLocale(): string | null {
-  if (typeof navigator === "undefined") return null;
-
-  const tags = [navigator.language, ...(navigator.languages ?? [])];
-  for (const tag of tags) {
-    const code = countryFromLocaleTag(tag);
-    if (code) return code;
-  }
-
-  return null;
-}
+const IPAPI_URL = "https://ipapi.co/json/";
 
 function isValidCountryCode(code: unknown): code is string {
-  return typeof code === "string" && /^[a-z]{2}$/.test(code);
+  return typeof code === "string" && /^[a-z]{2}$/i.test(code);
 }
 
+type IpApiResponse = {
+  country_code?: unknown;
+  error?: boolean;
+  reason?: string;
+};
+
 /**
- * Resolve a single country for Places Autocomplete restrictions.
- * Tries browser locale first, then server geo from IP headers.
- * Returns null to allow all countries when detection fails.
+ * Detect country from the visitor's IP via ipapi.co, mapped to a supported market.
  */
-export async function detectUserCountry(): Promise<string | null> {
-  const fromLocale = countryFromBrowserLocale();
-  if (fromLocale) return fromLocale;
-
+export async function detectDefaultSupportedCountry(): Promise<SupportedCountryCode> {
   try {
-    const res = await fetch("/api/public/geo-country", { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { country?: unknown };
-    if (isValidCountryCode(data.country)) return data.country;
-  } catch {
-    // fall through to unrestricted autocomplete
-  }
+    const res = await fetch(IPAPI_URL, { cache: "no-store" });
+    if (!res.ok) {
+      console.log("[address-autocomplete] Country detection failed: ipapi.co HTTP", res.status);
+      return resolveSupportedCountry(null);
+    }
 
-  return null;
+    const data = (await res.json()) as IpApiResponse;
+    if (data.error) {
+      console.log(
+        "[address-autocomplete] Country detection failed:",
+        data.reason ?? "ipapi.co returned an error",
+      );
+      return resolveSupportedCountry(null);
+    }
+
+    const raw = data.country_code;
+    if (!isValidCountryCode(raw)) {
+      console.log("[address-autocomplete] Country detection failed: invalid country_code", raw);
+      return resolveSupportedCountry(null);
+    }
+
+    const detected = raw.toLowerCase();
+    const selected = resolveSupportedCountry(detected);
+    console.log("[address-autocomplete] Detected country code:", detected, "→ using", selected);
+    return selected;
+  } catch (err) {
+    console.log("[address-autocomplete] Country detection failed:", err);
+    return resolveSupportedCountry(null);
+  }
 }

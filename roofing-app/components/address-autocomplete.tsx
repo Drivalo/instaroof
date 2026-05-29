@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { detectUserCountry } from "@/lib/detect-country";
+import type { SupportedCountryCode } from "@/lib/supported-countries";
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -28,6 +28,7 @@ export type AddressAutocompleteHandle = {
 };
 
 type AddressAutocompleteProps = {
+  countryCode: SupportedCountryCode;
   onAddressChange: (address: string) => void;
   onPlaceSelected?: (details: AddressPlaceDetails) => void;
   className?: string;
@@ -80,13 +81,20 @@ function loadGoogleMapsScript(): Promise<void> {
 
 const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocompleteProps>(
   function AddressAutocomplete(
-    { onAddressChange, onPlaceSelected, className, placeholder = "Enter your property address" },
+    { countryCode, onAddressChange, onPlaceSelected, className, placeholder = "Enter your property address" },
     ref,
   ) {
     const inputRef = useRef<HTMLInputElement>(null);
+    const autocompleteRef = useRef<{
+      addListener: (event: string, cb: () => void) => void;
+      setComponentRestrictions: (r: { country: string }) => void;
+      getPlace: () => {
+        formatted_address?: string;
+        geometry?: { location?: { lat: () => number; lng: () => number } };
+        address_components?: Array<{ types: string[]; short_name: string }>;
+      };
+    } | null>(null);
     const [selectedPlace, setSelectedPlace] = useState<AddressPlaceDetails | null>(null);
-    /** undefined = detecting; null = all countries; string = restrict to that ISO2 code */
-    const [restrictCountry, setRestrictCountry] = useState<string | null | undefined>(undefined);
     const onAddressChangeRef = useRef(onAddressChange);
     const onPlaceSelectedRef = useRef(onPlaceSelected);
 
@@ -101,17 +109,11 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
     }, [onAddressChange, onPlaceSelected]);
 
     useEffect(() => {
-      let cancelled = false;
-      detectUserCountry().then((code) => {
-        if (!cancelled) setRestrictCountry(code);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, []);
+      setSelectedPlace(null);
+    }, [countryCode]);
 
     useEffect(() => {
-      if (!GOOGLE_MAPS_KEY || !inputRef.current || restrictCountry === undefined) return;
+      if (!GOOGLE_MAPS_KEY || !inputRef.current) return;
 
       let cancelled = false;
 
@@ -119,20 +121,12 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
         .then(() => {
           if (cancelled || !inputRef.current || !window.google?.maps?.places) return;
 
-          const options: {
-            fields: string[];
-            types: string[];
-            componentRestrictions?: { country: string };
-          } = {
+          const instance = new window.google.maps.places.Autocomplete(inputRef.current, {
             fields: ["formatted_address", "geometry", "address_components"],
             types: ["address"],
-          };
-
-          if (restrictCountry) {
-            options.componentRestrictions = { country: restrictCountry };
-          }
-
-          const instance = new window.google.maps.places.Autocomplete(inputRef.current, options);
+            componentRestrictions: { country: countryCode },
+          });
+          autocompleteRef.current = instance;
 
           instance.addListener("place_changed", () => {
             const place = instance.getPlace();
@@ -142,7 +136,7 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
               place?.address_components?.find((c: { types: string[]; short_name: string }) =>
                 c.types.includes("postal_code"),
               )?.short_name || "";
-            const countryCode =
+            const countryFromPlace =
               place?.address_components?.find((c: { types: string[]; short_name: string }) =>
                 c.types.includes("country"),
               )?.short_name || "";
@@ -162,7 +156,7 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
               latitude,
               longitude,
               zipCode: zip,
-              countryCode,
+              countryCode: countryFromPlace,
             };
             setSelectedPlace(details);
             onPlaceSelectedRef.current?.(details);
@@ -174,8 +168,16 @@ const AddressAutocomplete = forwardRef<AddressAutocompleteHandle, AddressAutocom
 
       return () => {
         cancelled = true;
+        autocompleteRef.current = null;
       };
-    }, [restrictCountry]);
+    }, []);
+
+    useEffect(() => {
+      const instance = autocompleteRef.current;
+      if (!instance?.setComponentRestrictions) return;
+      instance.setComponentRestrictions({ country: countryCode });
+      console.log("[address-autocomplete] Applying Places componentRestrictions:", { country: countryCode });
+    }, [countryCode]);
 
     return (
       <input

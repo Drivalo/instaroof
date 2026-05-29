@@ -3,11 +3,11 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import AddressAutocomplete, {
+import AddressFieldWithCountry, {
   AddressAutocompleteHandle,
   AddressPlaceDetails,
-  hasGoogleMapsKey,
-} from "@/components/address-autocomplete";
+} from "@/components/address-field-with-country";
+import { hasGoogleMapsKey } from "@/components/address-autocomplete";
 
 type BootstrapData = {
   settings: {
@@ -237,9 +237,9 @@ export default function Home() {
 
           <div className="mt-10 md:mt-12 max-w-2xl">
             <div className="flex flex-col sm:flex-row gap-3">
-              <AddressAutocomplete
+              <AddressFieldWithCountry
                 ref={addressInputRef}
-                className="flex-1 w-full rounded-lg border border-border-subtle bg-surface px-4 py-3.5 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors"
+                className="flex-1 w-full"
                 placeholder="Enter your property address"
                 onAddressChange={(value) => {
                   setAddress(value);
