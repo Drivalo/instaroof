@@ -362,14 +362,21 @@ async function sendCustomerEmail(
     return { sent: false, skipped: true, reason: "RESEND_API_KEY not configured" };
   }
 
-  const record =
-    options.preloadedLead ?? (await fetchLeadForEmail(leadId));
+  let record = options.preloadedLead ?? (await fetchLeadForEmail(leadId));
   if (!record) {
     console.error("[customer-quote-email] no lead for email", {
       leadId,
       hadPreloadedLead: Boolean(options.preloadedLead),
     });
     return { sent: false, skipped: true, reason: "Lead not found" };
+  }
+
+  if (options.requireInspection && options.preloadedLead) {
+    console.info("[customer-quote-email] using preloaded lead from confirm route", {
+      leadId,
+      email: record.email ?? null,
+      inspection_datetime: record.inspection_datetime ?? null,
+    });
   }
 
   const dbInspection = record.inspection_datetime ?? null;

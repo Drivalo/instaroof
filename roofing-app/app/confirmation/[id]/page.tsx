@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type AppointmentDetails = {
@@ -22,11 +22,14 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     sessionId ? "" : "Missing payment session. Please contact us if you were charged.",
   );
 
-  const confirmStarted = useRef(false);
-
   useEffect(() => {
-    if (!sessionId || !leadId || confirmStarted.current) return;
-    confirmStarted.current = true;
+    if (!sessionId || !leadId) return;
+
+    const storageKey = `booking-confirm:${leadId}:${sessionId}`;
+    if (typeof window !== "undefined" && sessionStorage.getItem(storageKey) === "done") {
+      setStatus("success");
+      return;
+    }
 
     console.info("[confirmation-page] calling /api/bookings/confirm", { leadId, sessionId });
 
@@ -46,7 +49,12 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
           throw new Error(data.error || "Could not confirm your booking");
         }
         if (data.appointment) setAppointment(data.appointment);
+        if (typeof window !== "undefined") sessionStorage.setItem(storageKey, "done");
         setStatus("success");
+
+        if (data.emails?.customer && !data.emails.customer.sent) {
+          console.error("[confirmation-page] customer confirmation email not sent", data.emails.customer);
+        }
       })
       .catch((err) => {
         setStatus("error");

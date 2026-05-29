@@ -107,11 +107,21 @@ function formatAppointment(lead: LeadRecord): { date: string; time: string } | n
   return { date: schedule.date, time: schedule.time };
 }
 
-function subjectForContext(lead: LeadRecord, _context: LeadNotificationContext): string {
+function subjectForContext(lead: LeadRecord, context: LeadNotificationContext): string {
   const customerName = lead.name?.trim();
-  return customerName
-    ? `New roof inquiry — ${customerName}`
-    : `New roof inquiry — Lead #${lead.id}`;
+  if (customerName) {
+    return `New roof inquiry — ${customerName}`;
+  }
+  const address = lead.address?.trim();
+  if (address) {
+    const short = address.length > 48 ? `${address.slice(0, 48)}…` : address;
+    return `New roof inquiry — ${short}`;
+  }
+  console.warn("[lead-notification] subject fallback — no name or address on lead", {
+    leadId: lead.id,
+    context,
+  });
+  return "New roof inquiry";
 }
 
 function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: string, context: LeadNotificationContext) {
@@ -207,8 +217,10 @@ export async function sendLeadNotificationEmail(
   console.info("[lead-notification] lead loaded from Supabase", {
     leadId,
     context,
+    customerName: lead.name ?? null,
     inspection_datetime: lead.inspection_datetime ?? null,
     status: lead.status ?? null,
+    subject: subjectForContext(lead as LeadRecord, context),
   });
 
   const settings = await getSettings();

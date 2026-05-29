@@ -190,6 +190,12 @@ export async function POST(req: NextRequest) {
       customerEmail: lead.email ?? null,
     });
 
+    if (!lead.email?.trim()) {
+      console.error("[bookings/confirm] customer email skipped — lead has no email", {
+        leadId: numericLeadId,
+      });
+    }
+
     const customerEmailResult = await sendCustomerBookingConfirmedEmail(
       numericLeadId,
       appBaseUrl,

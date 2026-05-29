@@ -188,9 +188,7 @@ export async function POST(req: NextRequest) {
 
     if (error) return buildErrorResponse(error, "lead insert failed");
 
-    void sendLeadNotificationEmail(lead.id, req.nextUrl.origin, "submitted").catch((err) =>
-      console.error("[leads/create] lead notification failed:", err),
-    );
+    // BO email is sent when contact details are saved (quote page) so the subject includes the customer name.
 
     return NextResponse.json({ waitlist: false, lead });
   } catch (error) {
