@@ -95,10 +95,12 @@ body {
 }
 
 .pac-item {
-  padding: 12px 14px;
+  padding: 14px 16px;
+  min-height: 48px;
   cursor: pointer;
   color: var(--foreground);
   border-top: 1px solid var(--border-subtle);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .pac-item:first-child {

@@ -4,10 +4,10 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AddressFieldWithCountry, {
-  AddressAutocompleteHandle,
+  PostcodeAddressFieldHandle,
   AddressPlaceDetails,
 } from "@/components/address-field-with-country";
-import { hasGoogleMapsKey } from "@/components/address-autocomplete";
+import { hasGoogleMapsKey } from "@/lib/google-maps-script";
 
 type BootstrapData = {
   settings: {
@@ -25,7 +25,6 @@ type BootstrapData = {
 export default function Home() {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
-  const [address, setAddress] = useState("");
   const [placeDetails, setPlaceDetails] = useState<AddressPlaceDetails | null>(null);
   const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -33,7 +32,7 @@ export default function Home() {
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const [previewMaterial, setPreviewMaterial] = useState<string | null>(null);
-  const addressInputRef = useRef<AddressAutocompleteHandle>(null);
+  const addressInputRef = useRef<PostcodeAddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -53,13 +52,6 @@ export default function Home() {
     previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [mockQuoteVisible]);
 
-  function resolvePlaceOnSubmit() {
-    const fromRef = addressInputRef.current?.getPlaceDetails();
-    const details = fromRef ?? placeDetails;
-    if (fromRef) setPlaceDetails(fromRef);
-    return details;
-  }
-
   function hasValidCoords(lat?: number, lng?: number) {
     return (
       lat != null &&
@@ -70,23 +62,18 @@ export default function Home() {
     );
   }
 
-  async function createLead() {
-    const inputValue = addressInputRef.current?.getValue() ?? "";
-    const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
+  const hasValidAddress =
+    placeDetails != null &&
+    hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-    if (!resolvedAddress) {
-      alert("Please enter your property address.");
+  async function createLead() {
+    const details = addressInputRef.current?.getPlaceDetails() ?? placeDetails;
+    if (!details || !hasValidCoords(details.latitude, details.longitude)) {
       return;
     }
 
-    if (resolvedAddress !== address) {
-      setAddress(resolvedAddress);
-    }
-
-    const details = resolvePlaceOnSubmit();
-    const lat = details?.latitude;
-    const lng = details?.longitude;
-    const useCoords = hasValidCoords(lat, lng);
+    const lat = details.latitude;
+    const lng = details.longitude;
 
     setMockQuoteVisible(true);
     setLoadingPreview(true);
@@ -99,9 +86,10 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          address: details?.address ?? resolvedAddress,
-          ...(useCoords ? { latitude: lat, longitude: lng } : {}),
-          country_code: details?.countryCode ?? null,
+          address: details.address,
+          latitude: lat,
+          longitude: lng,
+          country_code: details.countryCode ?? null,
         }),
       });
       const data = await res.json();
@@ -121,12 +109,8 @@ export default function Home() {
   }
 
   async function createRealLead() {
-    const inputValue = addressInputRef.current?.getValue() ?? "";
-    const resolvedAddress = (placeDetails?.address ?? address ?? inputValue).trim();
-    const details = resolvePlaceOnSubmit();
-
-    if (!resolvedAddress || !details || !hasValidCoords(details.latitude, details.longitude)) {
-      alert("Please select a full address from the suggestions dropdown.");
+    const details = addressInputRef.current?.getPlaceDetails() ?? placeDetails;
+    if (!details || !hasValidCoords(details.latitude, details.longitude)) {
       return;
     }
 
@@ -236,22 +220,17 @@ export default function Home() {
           </p>
 
           <div className="mt-10 md:mt-12 max-w-2xl">
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3">
               <AddressFieldWithCountry
                 ref={addressInputRef}
-                className="flex-1 w-full"
-                placeholder="Enter your property address"
-                onAddressChange={(value) => {
-                  setAddress(value);
-                  setPlaceDetails(null);
-                }}
+                className="w-full"
                 onPlaceSelected={setPlaceDetails}
               />
               <button
                 type="button"
                 onClick={createLead}
-                disabled={loadingPreview}
-                className="relative z-10 btn-accent shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide"
+                disabled={loadingPreview || !hasValidAddress}
+                className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
@@ -305,8 +284,13 @@ export default function Home() {
               <button
                 type="button"
                 onClick={createRealLead}
-                disabled={loadingAnalysis || loadingPreview || !previewRoofLabel}
-                className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm tracking-wide disabled:opacity-50"
+                disabled={
+                  loadingAnalysis ||
+                  loadingPreview ||
+                  !previewRoofLabel ||
+                  !hasValidAddress
+                }
+                className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loadingAnalysis ? "Starting analysis…" : "Continue with full AI analysis"}
               </button>
@@ -321,7 +305,7 @@ export default function Home() {
           <h2 className="text-2xl md:text-3xl">How it works</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {[
-              { step: "01", text: "Enter your address" },
+              { step: "01", text: "Enter your postcode and address" },
               { step: "02", text: "We analyse your roof from satellite imagery" },
               { step: "03", text: "Receive your quote instantly" },
             ].map((item) => (
