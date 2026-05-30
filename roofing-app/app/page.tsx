@@ -45,7 +45,7 @@ export default function Home() {
       .catch((err) => console.error("bootstrap load failed:", err));
   }, []);
 
-  const companyName = bootstrap?.settings?.company_name ?? "Acme Roofing";
+  const companyName = bootstrap?.settings?.company_name ?? "Nimly";
   const companyLogo = bootstrap?.settings?.company_logo_url;
 
   useEffect(() => {
@@ -229,7 +229,7 @@ export default function Home() {
           ) : null}
 
           <h1 className="hero-headline">
-            Get your roof quote in 60 seconds
+            Get your roof quote in 60 seconds with Nimly
           </h1>
           <p className="mt-5 text-lg md:text-xl text-muted max-w-xl leading-relaxed">
             See your price. Decide when you&apos;re ready.
@@ -359,7 +359,7 @@ export default function Home() {
       </section>
 
       <footer className="container-max py-8 text-sm text-muted border-t border-border-subtle">
-        Powered by InstaRoof Quote for {companyName}
+        Nimly © 2026
       </footer>
     </main>
   );

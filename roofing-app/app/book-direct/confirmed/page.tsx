@@ -26,18 +26,62 @@ function DirectBookingConfirmedContent() {
   useEffect(() => {
     if (!sessionId) return;
 
-    fetch(`/api/checkout/verify?session_id=${encodeURIComponent(sessionId)}`)
+    const storageKey = `direct-booking-confirm:${sessionId}`;
+    const previouslyDone =
+      typeof window !== "undefined" && sessionStorage.getItem(storageKey) === "done";
+
+    if (previouslyDone) {
+      setStatus("success");
+    }
+
+    console.info("[book-direct/confirmed] calling /api/checkout/confirm", {
+      sessionId,
+      previouslyDone,
+    });
+
+    fetch("/api/checkout/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok || !data.paid) {
+        console.info("[book-direct/confirmed] confirm response", {
+          ok: res.ok,
+          status: res.status,
+          data,
+        });
+        if (!res.ok || !data.ok) {
           throw new Error(data.error || "Payment could not be verified");
         }
-        setBooking(data);
+        setBooking({
+          paid: true,
+          customerEmail: data.customerEmail,
+          customerName: data.customerName,
+          address: data.address,
+          inspectionDate: data.inspectionDate,
+        });
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(storageKey, "done");
+        }
         setStatus("success");
+
+        if (data.email?.sent) {
+          console.info("[book-direct/confirmed] customer confirmation email sent", data.email);
+        } else if (data.email) {
+          console.error("[book-direct/confirmed] customer confirmation email not sent", data.email);
+        }
       })
       .catch((err) => {
-        setStatus("error");
-        setError(err instanceof Error ? err.message : "Verification failed");
+        if (!previouslyDone) {
+          setStatus("error");
+          setError(err instanceof Error ? err.message : "Verification failed");
+        } else {
+          console.warn(
+            "[book-direct/confirmed] re-confirm failed but payment was already verified",
+            err instanceof Error ? err.message : err,
+          );
+        }
       });
   }, [sessionId]);
 

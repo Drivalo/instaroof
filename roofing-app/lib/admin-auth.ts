@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "instaroof_admin";
+const COOKIE_NAME = "nimly_admin";
 
 export async function isAdminAuthenticated() {
   const store = await cookies();

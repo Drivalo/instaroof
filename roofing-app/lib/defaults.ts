@@ -1,9 +1,9 @@
 import { SettingsRow } from "@/lib/types";
 
 export const DEFAULT_SETTINGS: Omit<SettingsRow, "id"> = {
-  company_name: "Acme Roofing",
+  company_name: "Nimly",
   company_phone: "(555) 123-4567",
-  company_email: "quotes@acmeroofing.com",
+  company_email: "hello@nimly.tech",
   company_logo_url: null,
   company_address: "123 Main St, Springfield",
   primary_color: "#C8102E",
@@ -35,5 +35,5 @@ export const DEFAULT_SETTINGS: Omit<SettingsRow, "id"> = {
     "Your inspection is confirmed for {{inspection_date}} at {{inspection_time}}.",
   email_template_inspection_reminder:
     "Reminder: your inspection is tomorrow at {{inspection_time}}.",
-  owner_name: "Acme Roofing Team",
+  owner_name: "Nimly Team",
 };

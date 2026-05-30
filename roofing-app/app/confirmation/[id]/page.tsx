@@ -26,12 +26,26 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     if (!sessionId || !leadId) return;
 
     const storageKey = `booking-confirm:${leadId}:${sessionId}`;
-    if (typeof window !== "undefined" && sessionStorage.getItem(storageKey) === "done") {
+    const previouslyDone =
+      typeof window !== "undefined" && sessionStorage.getItem(storageKey) === "done";
+
+    if (previouslyDone) {
       setStatus("success");
-      return;
+      const cached = sessionStorage.getItem(`${storageKey}:appointment`);
+      if (cached) {
+        try {
+          setAppointment(JSON.parse(cached) as AppointmentDetails);
+        } catch {
+          /* ignore invalid cache */
+        }
+      }
     }
 
-    console.info("[confirmation-page] calling /api/bookings/confirm", { leadId, sessionId });
+    console.info("[confirmation-page] calling /api/bookings/confirm", {
+      leadId,
+      sessionId,
+      previouslyDone,
+    });
 
     fetch("/api/bookings/confirm", {
       method: "POST",
@@ -49,16 +63,30 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
           throw new Error(data.error || "Could not confirm your booking");
         }
         if (data.appointment) setAppointment(data.appointment);
-        if (typeof window !== "undefined") sessionStorage.setItem(storageKey, "done");
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(storageKey, "done");
+          if (data.appointment) {
+            sessionStorage.setItem(`${storageKey}:appointment`, JSON.stringify(data.appointment));
+          }
+        }
         setStatus("success");
 
-        if (data.emails?.customer && !data.emails.customer.sent) {
+        if (data.emails?.customer?.sent) {
+          console.info("[confirmation-page] customer confirmation email sent", data.emails.customer);
+        } else if (data.emails?.customer) {
           console.error("[confirmation-page] customer confirmation email not sent", data.emails.customer);
         }
       })
       .catch((err) => {
-        setStatus("error");
-        setError(err instanceof Error ? err.message : "Confirmation failed");
+        if (!previouslyDone) {
+          setStatus("error");
+          setError(err instanceof Error ? err.message : "Confirmation failed");
+        } else {
+          console.warn(
+            "[confirmation-page] re-confirm failed but booking was already confirmed",
+            err instanceof Error ? err.message : err,
+          );
+        }
       });
   }, [sessionId, leadId]);
 

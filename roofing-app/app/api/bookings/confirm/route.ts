@@ -4,6 +4,7 @@ import {
   mapRowToLeadRecord,
   sendCustomerBookingConfirmedEmail,
 } from "@/lib/customer-quote-email";
+import { ensureEnvLoaded } from "@/lib/env.server";
 import {
   formatInspectionSchedule,
   normalizeInspectionDatetime,
@@ -15,6 +16,8 @@ import { getStripeClient } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
+    ensureEnvLoaded();
+
     const body = await req.json();
     const { leadId, sessionId } = body;
 
@@ -182,36 +185,76 @@ export async function POST(req: NextRequest) {
       resendFrom: process.env.RESEND_FROM_EMAIL?.trim() || "(default)",
     });
 
-    console.info("[bookings/confirm] CALLING sendCustomerBookingConfirmedEmail NOW", {
-      functionCalled: true,
-      leadId: numericLeadId,
-      appBaseUrl,
-      inspectionDatetimePassed: inspectionIsoFinal,
-      customerEmail: lead.email ?? null,
-    });
-
     if (!lead.email?.trim()) {
       console.error("[bookings/confirm] customer email skipped — lead has no email", {
         leadId: numericLeadId,
       });
     }
 
-    const customerEmailResult = await sendCustomerBookingConfirmedEmail(
-      numericLeadId,
-      appBaseUrl,
-      {
-        inspectionDatetime: inspectionIsoFinal,
-        preloadedLead: mapRowToLeadRecord(lead as Record<string, unknown>),
-      },
-    );
+    const emailAlreadySent = session.metadata?.customer_email_sent === "true";
+    let customerEmailResult;
 
-    console.info("[bookings/confirm] AFTER sendCustomerBookingConfirmedEmail", {
+    if (emailAlreadySent) {
+      console.info("[bookings/confirm] customer email already sent (Stripe metadata)", {
+        leadId: numericLeadId,
+        messageId: session.metadata?.customer_email_message_id ?? null,
+      });
+      customerEmailResult = {
+        sent: true,
+        skipped: true,
+        reason: "Already sent for this checkout session",
+        messageId: session.metadata?.customer_email_message_id ?? undefined,
+      };
+    } else {
+      console.info("[bookings/confirm] ATTEMPTING sendCustomerBookingConfirmedEmail", {
+        leadId: numericLeadId,
+        appBaseUrl,
+        inspectionDatetimePassed: inspectionIsoFinal,
+        customerEmail: lead.email ?? null,
+        hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
+      });
+
+      customerEmailResult = await sendCustomerBookingConfirmedEmail(
+        numericLeadId,
+        appBaseUrl,
+        {
+          inspectionDatetime: inspectionIsoFinal,
+          preloadedLead: mapRowToLeadRecord({
+            ...(lead as Record<string, unknown>),
+            deposit_paid: true,
+            inspection_datetime: inspectionIsoFinal,
+          }),
+        },
+      );
+
+      if (customerEmailResult.sent && customerEmailResult.messageId) {
+        try {
+          await stripe.checkout.sessions.update(sessionId, {
+            metadata: {
+              ...(session.metadata ?? {}),
+              customer_email_sent: "true",
+              customer_email_message_id: customerEmailResult.messageId,
+            },
+          });
+          console.info("[bookings/confirm] marked customer email sent in Stripe metadata", {
+            leadId: numericLeadId,
+            messageId: customerEmailResult.messageId,
+          });
+        } catch (metaErr) {
+          console.warn("[bookings/confirm] could not update Stripe metadata after email send", {
+            leadId: numericLeadId,
+            error: metaErr instanceof Error ? metaErr.message : String(metaErr),
+          });
+        }
+      }
+    }
+
+    console.info("[bookings/confirm] customer email result", {
       leadId: numericLeadId,
       sent: customerEmailResult.sent,
       skipped: customerEmailResult.skipped ?? false,
       reason: customerEmailResult.reason ?? null,
       messageId: customerEmailResult.messageId ?? null,
-      fullResult: customerEmailResult,
     });
 
     console.info("[bookings/confirm] sending BO booking notification email", {

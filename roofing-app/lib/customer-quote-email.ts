@@ -144,6 +144,17 @@ function appointmentHtml(lead: LeadRecord, settings: SettingsRow): string {
                     <p style="margin:0;font-size:16px;font-weight:500;color:#ffffff;line-height:1.4;">${lead.address}</p>
                   </td>
                 </tr>
+                ${
+                  lead.deposit_paid
+                    ? `<tr><td style="height:10px;"></td></tr>
+                <tr>
+                  <td style="padding:14px 16px;background-color:#1c1c1c;border:1px solid #22c55e;border-radius:8px;">
+                    <p style="margin:0 0 4px;font-size:12px;color:#a0a0a0;">Deposit</p>
+                    <p style="margin:0;font-size:16px;font-weight:500;color:#22c55e;">✓ ${deposit} paid — confirmation received</p>
+                  </td>
+                </tr>`
+                    : ""
+                }
               </table>
               <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#a0a0a0;">
                 Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.
@@ -195,7 +206,7 @@ function buildHtml(
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background-color:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;">
           <tr>
             <td style="padding:32px 28px;">
-              <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">InstaRoof Quote</p>
+              <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">Nimly</p>
               <h1 style="margin:0 0 20px;font-size:22px;font-weight:500;color:#ffffff;line-height:1.3;">${headline}</h1>
               <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#a0a0a0;">
                 ${intro}
@@ -252,6 +263,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
       `Time: ${schedule.time}`,
       `Address: ${lead.address}`,
       "",
+      ...(lead.deposit_paid ? [`Deposit: ${deposit} paid — confirmation received`, ""] : []),
       `Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.`,
       "",
     );
@@ -425,7 +437,7 @@ async function sendCustomerEmail(
   const settings = await getSettings();
   const firstName = (record.name?.trim().split(/\s+/)[0] || "there").replace(/[<>]/g, "");
   const quoteUrl = `${appBaseUrl.replace(/\/$/, "")}/quote/${leadId}`;
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || "hello@nimly.tech";
   const subject = options.requireInspection ? SUBJECT_BOOKED : resolveSubject(record);
 
   try {
@@ -489,15 +501,104 @@ export async function sendCustomerBookingConfirmedEmail(
   appBaseUrl: string,
   options?: BookingConfirmedEmailOptions,
 ): Promise<CustomerQuoteEmailResult> {
+  ensureEnvLoaded();
   console.info("[customer-quote-email] sendCustomerBookingConfirmedEmail ENTRY", {
     leadId,
     inspectionDatetimeFromConfirm: options?.inspectionDatetime ?? null,
     hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
-    resendFrom: process.env.RESEND_FROM_EMAIL?.trim() || "(default onboarding@resend.dev)",
+    resendFrom: process.env.RESEND_FROM_EMAIL?.trim() || "(default hello@nimly.tech)",
   });
   return sendCustomerEmail(leadId, appBaseUrl, {
     requireInspection: true,
     inspectionDatetimeFromConfirm: options?.inspectionDatetime ?? null,
     preloadedLead: options?.preloadedLead ?? null,
   });
+}
+
+export type DirectBookingEmailInput = {
+  customerName: string;
+  customerEmail: string;
+  address: string;
+  inspectionDateIso: string;
+  appBaseUrl: string;
+};
+
+/** Direct book flow (no lead record) — sends booking confirmation after Stripe payment. */
+export async function sendDirectBookingConfirmationEmail(
+  input: DirectBookingEmailInput,
+): Promise<CustomerQuoteEmailResult> {
+  ensureEnvLoaded();
+  console.info("[customer-quote-email] sendDirectBookingConfirmationEmail ENTRY", {
+    customerEmail: input.customerEmail,
+    inspectionDateIso: input.inspectionDateIso,
+    hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
+    resendFrom: process.env.RESEND_FROM_EMAIL?.trim() || "(default hello@nimly.tech)",
+  });
+
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn("[customer-quote-email] RESEND_API_KEY not set — skipping direct booking email");
+    return { sent: false, skipped: true, reason: "RESEND_API_KEY not configured" };
+  }
+
+  const to = input.customerEmail?.trim();
+  if (!to) {
+    console.error("[customer-quote-email] direct booking email BLOCKED — no customer email");
+    return { sent: false, skipped: true, reason: "Customer has no email" };
+  }
+
+  const settings = await getSettings();
+  const firstName = (input.customerName?.trim().split(/\s+/)[0] || "there").replace(/[<>]/g, "");
+  const lead: LeadRecord = {
+    id: 0,
+    name: input.customerName,
+    email: input.customerEmail,
+    address: input.address,
+    inspection_datetime: input.inspectionDateIso,
+    deposit_paid: true,
+  };
+  const quoteUrl = `${input.appBaseUrl.replace(/\/$/, "")}/`;
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || "hello@nimly.tech";
+  const subject = SUBJECT_BOOKED;
+
+  try {
+    console.info("[customer-quote-email] calling Resend API (direct booking)", { from, to, subject });
+    const resend = new Resend(apiKey);
+    const { data, error: sendError } = await resend.emails.send({
+      from,
+      to: [to],
+      subject,
+      html: buildHtml(lead, settings, quoteUrl, firstName),
+      text: buildPlainText(lead, settings, quoteUrl, firstName),
+    });
+
+    if (sendError) {
+      console.error("[customer-quote-email] Resend RETURNED ERROR (direct booking)", {
+        to,
+        subject,
+        errorMessage: sendError.message,
+      });
+      return { sent: false, reason: sendError.message };
+    }
+
+    if (!data?.id) {
+      console.error("[customer-quote-email] Resend returned no messageId (direct booking)", { to, data });
+      return { sent: false, reason: "Resend returned no message id" };
+    }
+
+    console.info("[customer-quote-email] Resend SUCCESS (direct booking)", {
+      to,
+      subject,
+      messageId: data.id,
+    });
+    return { sent: true, messageId: data.id };
+  } catch (err) {
+    console.error("[customer-quote-email] Resend THREW (direct booking)", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      sent: false,
+      reason: err instanceof Error ? err.message : "Failed to send email",
+    };
+  }
 }

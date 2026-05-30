@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       cancel_url: cancelUrl,
       metadata: {
         address,
+        email,
         customer_name: name,
         inspection_date: date,
         booking_type: "direct",
