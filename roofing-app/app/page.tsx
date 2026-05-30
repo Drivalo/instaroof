@@ -75,10 +75,7 @@ export default function Home() {
 
   async function handlePrimaryCta() {
     if (addressFlowStep === 1) {
-      const ok = await addressInputRef.current?.advanceToAddressStep();
-      if (!ok) {
-        alert("Please enter a valid postcode for your selected country.");
-      }
+      await addressInputRef.current?.advanceToAddressStep();
       return;
     }
     await createLead();

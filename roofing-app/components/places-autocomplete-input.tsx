@@ -2,15 +2,22 @@
 
 import { useEffect, useId, useRef } from "react";
 import { loadGoogleMapsScript } from "@/lib/google-maps-script";
-import { parseGooglePlace, type MapBoundsLiteral, type ParsedPlaceDetails } from "@/lib/parse-google-place";
+import { parseGooglePlace, type ParsedPlaceDetails } from "@/lib/parse-google-place";
 import type { SupportedCountryCode } from "@/lib/supported-countries";
+
+export type LocationCenter = {
+  lat: number;
+  lng: number;
+};
 
 type PlacesAutocompleteInputProps = {
   id?: string;
   countryCode: SupportedCountryCode;
   placeTypes: string[];
-  bounds?: MapBoundsLiteral;
-  /** When true, only results inside bounds (required for postcode-scoped address search). */
+  /** Postcode centre from Postcodes.io / Geocoding API */
+  locationCenter?: LocationCenter | null;
+  /** Search radius in metres (e.g. 200 strict, 1000 fallback) */
+  radiusMeters?: number;
   strictBounds?: boolean;
   placeholder: string;
   className?: string;
@@ -20,17 +27,21 @@ type PlacesAutocompleteInputProps = {
   onPlaceSelected: (details: ParsedPlaceDetails) => void;
 };
 
-function toLatLngBounds(bounds: MapBoundsLiteral) {
-  const sw = new window.google.maps.LatLng(bounds.south, bounds.west);
-  const ne = new window.google.maps.LatLng(bounds.north, bounds.east);
-  return new window.google.maps.LatLngBounds(sw, ne);
+function circleBounds(lat: number, lng: number, radiusMeters: number) {
+  const center = new window.google.maps.LatLng(lat, lng);
+  const circle = new window.google.maps.Circle({
+    center,
+    radius: radiusMeters,
+  });
+  return { center, bounds: circle.getBounds() };
 }
 
 export function PlacesAutocompleteInput({
   id: idProp,
   countryCode,
   placeTypes,
-  bounds,
+  locationCenter,
+  radiusMeters,
   strictBounds = false,
   placeholder,
   className,
@@ -44,13 +55,25 @@ export function PlacesAutocompleteInput({
     addListener: (event: string, cb: () => void) => void;
     setComponentRestrictions: (r: { country: string }) => void;
     setBounds: (b: unknown) => void;
-    setOptions: (o: { strictBounds?: boolean }) => void;
+    setOptions: (o: {
+      strictBounds?: boolean;
+      bounds?: unknown;
+      location?: unknown;
+      radius?: number;
+    }) => void;
     getPlace: () => Parameters<typeof parseGooglePlace>[0];
   } | null>(null);
   const onTextChangeRef = useRef(onTextChange);
   const onPlaceSelectedRef = useRef(onPlaceSelected);
   const generatedId = useId();
   const inputId = idProp ?? generatedId;
+
+  const hasLocation =
+    locationCenter != null &&
+    Number.isFinite(locationCenter.lat) &&
+    Number.isFinite(locationCenter.lng) &&
+    radiusMeters != null &&
+    radiusMeters > 0;
 
   useEffect(() => {
     onTextChangeRef.current = onTextChange;
@@ -59,6 +82,7 @@ export function PlacesAutocompleteInput({
 
   useEffect(() => {
     if (disabled || !inputRef.current) return;
+    if (placeTypes.includes("address") && !hasLocation) return;
 
     let cancelled = false;
 
@@ -72,11 +96,16 @@ export function PlacesAutocompleteInput({
           componentRestrictions: { country: countryCode },
         };
 
-        if (bounds) {
-          options.bounds = toLatLngBounds(bounds);
+        if (hasLocation && locationCenter && radiusMeters) {
+          const { center, bounds } = circleBounds(
+            locationCenter.lat,
+            locationCenter.lng,
+            radiusMeters,
+          );
+          options.location = center;
+          options.radius = radiusMeters;
+          options.bounds = bounds;
           options.strictBounds = strictBounds;
-        } else if (strictBounds) {
-          console.warn("[places-autocomplete] strictBounds requested but no bounds provided");
         }
 
         const instance = new window.google.maps.places.Autocomplete(inputRef.current, options);
@@ -85,8 +114,9 @@ export function PlacesAutocompleteInput({
         console.log("[places-autocomplete] initialized", {
           types: placeTypes,
           componentRestrictions: { country: countryCode },
-          bounds: bounds ?? null,
-          strictBounds: Boolean(bounds && strictBounds),
+          location: hasLocation ? locationCenter : null,
+          radius: radiusMeters ?? null,
+          strictBounds: Boolean(hasLocation && strictBounds),
         });
 
         instance.addListener("place_changed", () => {
@@ -104,20 +134,39 @@ export function PlacesAutocompleteInput({
       cancelled = true;
       autocompleteRef.current = null;
     };
-  }, [disabled, placeTypes.join(","), countryCode, bounds, strictBounds]);
+  }, [
+    disabled,
+    placeTypes.join(","),
+    countryCode,
+    hasLocation,
+    locationCenter?.lat,
+    locationCenter?.lng,
+    radiusMeters,
+    strictBounds,
+  ]);
 
   useEffect(() => {
     const instance = autocompleteRef.current;
-    if (!instance) return;
+    if (!instance || !hasLocation || !locationCenter || !radiusMeters) return;
+
     instance.setComponentRestrictions?.({ country: countryCode });
-    console.log("[places-autocomplete] componentRestrictions updated:", { country: countryCode });
-    if (bounds && instance.setBounds) {
-      const latLngBounds = toLatLngBounds(bounds);
-      instance.setBounds(latLngBounds);
-      instance.setOptions?.({ strictBounds: Boolean(strictBounds) });
-      console.log("[places-autocomplete] bounds updated:", { bounds, strictBounds: Boolean(strictBounds) });
-    }
-  }, [countryCode, bounds, strictBounds]);
+
+    const { center, bounds } = circleBounds(locationCenter.lat, locationCenter.lng, radiusMeters);
+    if (bounds) instance.setBounds(bounds);
+    instance.setOptions({
+      strictBounds: Boolean(strictBounds),
+      bounds,
+      location: center,
+      radius: radiusMeters,
+    });
+
+    console.log("[places-autocomplete] location bias updated:", {
+      componentRestrictions: { country: countryCode },
+      location: { lat: locationCenter.lat, lng: locationCenter.lng },
+      radius: radiusMeters,
+      strictBounds,
+    });
+  }, [countryCode, locationCenter?.lat, locationCenter?.lng, radiusMeters, strictBounds, hasLocation]);
 
   return (
     <input
