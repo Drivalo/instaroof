@@ -83,15 +83,18 @@ body {
   opacity: 0.5;
 }
 
-/* Google Places Autocomplete dropdown */
+/* Google Places Autocomplete dropdown (appended to document.body) */
 .pac-container {
-  z-index: 10000 !important;
+  z-index: 99999 !important;
+  position: fixed !important;
   border-radius: 0.5rem;
   border: 1px solid var(--border-subtle);
-  box-shadow: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   margin-top: 4px;
   font-family: var(--font-dm-sans), system-ui, sans-serif;
   background: var(--surface);
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .pac-item {

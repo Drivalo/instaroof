@@ -10,6 +10,7 @@ type PlacesAutocompleteInputProps = {
   countryCode: SupportedCountryCode;
   placeTypes: string[];
   bounds?: MapBoundsLiteral;
+  /** When true, only results inside bounds (often too strict for postcodes). Default: bias only. */
   strictBounds?: boolean;
   placeholder: string;
   className?: string;
@@ -58,6 +59,9 @@ export function PlacesAutocompleteInput({
     if (disabled || !inputRef.current) return;
 
     let cancelled = false;
+    const boundsKey = bounds
+      ? `${bounds.north},${bounds.south},${bounds.east},${bounds.west}`
+      : "none";
 
     loadGoogleMapsScript()
       .then(() => {
@@ -77,6 +81,13 @@ export function PlacesAutocompleteInput({
         const instance = new window.google.maps.places.Autocomplete(inputRef.current, options);
         autocompleteRef.current = instance;
 
+        console.log("[places-autocomplete] initialized", {
+          types: placeTypes,
+          country: countryCode,
+          bounds: bounds ?? null,
+          strictBounds: Boolean(bounds && strictBounds),
+        });
+
         instance.addListener("place_changed", () => {
           const parsed = parseGooglePlace(instance.getPlace());
           if (!parsed) return;
@@ -92,7 +103,7 @@ export function PlacesAutocompleteInput({
       cancelled = true;
       autocompleteRef.current = null;
     };
-  }, [disabled, placeTypes.join(","), countryCode]);
+  }, [disabled, placeTypes.join(","), countryCode, boundsKey, strictBounds]);
 
   useEffect(() => {
     const instance = autocompleteRef.current;

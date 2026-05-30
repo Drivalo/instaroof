@@ -28,7 +28,7 @@ type GooglePlaceResult = {
   address_components?: AddressComponent[];
 };
 
-function boundsFromViewport(
+export function boundsFromViewport(
   viewport: NonNullable<GooglePlaceResult["geometry"]>["viewport"],
 ): MapBoundsLiteral | undefined {
   if (!viewport) return undefined;
@@ -42,7 +42,7 @@ function boundsFromViewport(
   };
 }
 
-function boundsAroundPoint(lat: number, lng: number, delta = 0.04): MapBoundsLiteral {
+export function boundsAroundPoint(lat: number, lng: number, delta = 0.04): MapBoundsLiteral {
   return {
     north: lat + delta,
     south: lat - delta,
@@ -69,7 +69,7 @@ export function parseGooglePlace(place: GooglePlaceResult | null | undefined): P
     place.address_components?.find((c) => c.types.includes("country"))?.short_name || "";
 
   const bounds =
-    boundsFromViewport(place.geometry?.viewport) ?? boundsAroundPoint(latitude, longitude);
+    boundsFromViewport(place.geometry?.viewport) ?? boundsAroundPoint(latitude, longitude, 0.06);
 
   return {
     address: place.formatted_address || "",

@@ -26,6 +26,8 @@ export default function Home() {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [placeDetails, setPlaceDetails] = useState<AddressPlaceDetails | null>(null);
+  const [addressFlowStep, setAddressFlowStep] = useState<1 | 2>(1);
+  const [postcodeInput, setPostcodeInput] = useState("");
   const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -65,6 +67,21 @@ export default function Home() {
   const hasValidAddress =
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
+
+  const canSubmitPostcode = postcodeInput.trim().length >= 3;
+  const primaryCtaEnabled =
+    addressFlowStep === 1 ? canSubmitPostcode && !loadingPreview : hasValidAddress && !loadingPreview;
+
+  async function handlePrimaryCta() {
+    if (addressFlowStep === 1) {
+      const ok = await addressInputRef.current?.advanceToAddressStep();
+      if (!ok) {
+        alert("Please enter a valid postcode for your selected country.");
+      }
+      return;
+    }
+    await createLead();
+  }
 
   async function createLead() {
     const details = addressInputRef.current?.getPlaceDetails() ?? placeDetails;
@@ -213,26 +230,32 @@ export default function Home() {
           ) : null}
 
           <h1 className="hero-headline">
-            Get your roof quote in 60 seconds with Nimly
+            Get your quote in 60 seconds
           </h1>
           <p className="mt-5 text-lg md:text-xl text-muted max-w-xl leading-relaxed">
             See your price. Decide when you&apos;re ready.
           </p>
 
-          <div className="mt-10 md:mt-12 max-w-2xl">
-            <div className="flex flex-col gap-3">
+          <div className="mt-10 md:mt-12 max-w-2xl overflow-visible">
+            <div className="flex flex-col gap-3 overflow-visible">
               <AddressFieldWithCountry
                 ref={addressInputRef}
                 className="w-full"
+                onStepChange={setAddressFlowStep}
+                onPostcodeChange={setPostcodeInput}
                 onPlaceSelected={setPlaceDetails}
               />
               <button
                 type="button"
-                onClick={createLead}
-                disabled={loadingPreview || !hasValidAddress}
+                onClick={() => void handlePrimaryCta()}
+                disabled={!primaryCtaEnabled}
                 className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
+                {loadingPreview
+                  ? "Estimating…"
+                  : addressFlowStep === 1
+                    ? "Continue"
+                    : "Get My Instant Quote"}
               </button>
             </div>
 

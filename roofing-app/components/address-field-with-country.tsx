@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
 import { PlacesAutocompleteInput } from "@/components/places-autocomplete-input";
 import { detectDefaultSupportedCountry } from "@/lib/detect-country";
+import { geocodePostcode } from "@/lib/geocode-postcode";
 import type { MapBoundsLiteral } from "@/lib/parse-google-place";
 import {
   getSupportedCountry,
@@ -21,6 +22,9 @@ export type AddressPlaceDetails = {
 export type PostcodeAddressFieldHandle = {
   getPlaceDetails: () => AddressPlaceDetails | null;
   hasValidAddress: () => boolean;
+  getPostcode: () => string;
+  isOnAddressStep: () => boolean;
+  advanceToAddressStep: () => Promise<boolean>;
 };
 
 /** @deprecated Use PostcodeAddressFieldHandle */
@@ -31,8 +35,10 @@ function flagImageUrl(code: SupportedCountryCode) {
 }
 
 type PostcodeAddressFieldProps = {
+  onPostcodeChange?: (postcode: string) => void;
   onAddressChange?: (address: string) => void;
   onPlaceSelected?: (details: AddressPlaceDetails | null) => void;
+  onStepChange?: (step: 1 | 2) => void;
   className?: string;
 };
 
@@ -40,19 +46,24 @@ const fieldClass =
   "min-w-0 w-full rounded-lg border-0 bg-[#1C1C1C] px-4 py-3.5 text-[#FFFFFF] placeholder:text-[#A0A0A0]/70 focus:outline-none";
 
 const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddressFieldProps>(
-  function PostcodeAddressField({ onAddressChange, onPlaceSelected, className = "" }, ref) {
+  function PostcodeAddressField(
+    { onPostcodeChange, onAddressChange, onPlaceSelected, onStepChange, className = "" },
+    ref,
+  ) {
     const [countryCode, setCountryCode] = useState<SupportedCountryCode>("us");
     const [ready, setReady] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [postcodeLabel, setPostcodeLabel] = useState("");
     const [postcodeBounds, setPostcodeBounds] = useState<MapBoundsLiteral | null>(null);
     const [addressDetails, setAddressDetails] = useState<AddressPlaceDetails | null>(null);
+    const [geocoding, setGeocoding] = useState(false);
     const menuId = useId();
     const postcodeLabelId = useId();
     const addressLabelId = useId();
     const rootRef = useRef<HTMLDivElement>(null);
+    const addressSectionRef = useRef<HTMLDivElement>(null);
 
-    const step: 1 | 2 = postcodeBounds ? 2 : 1;
+    const addressStepActive = postcodeBounds != null;
 
     useImperativeHandle(ref, () => ({
       getPlaceDetails: () => addressDetails,
@@ -60,7 +71,44 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
         addressDetails != null &&
         Number.isFinite(addressDetails.latitude) &&
         Number.isFinite(addressDetails.longitude),
+      getPostcode: () => postcodeLabel.trim(),
+      isOnAddressStep: () => addressStepActive,
+      advanceToAddressStep: () => commitPostcode(postcodeLabel),
     }));
+
+    function goToStep(step: 1 | 2) {
+      onStepChange?.(step);
+    }
+
+    function commitPostcodeFromParsed(label: string, bounds: MapBoundsLiteral | null) {
+      if (!bounds) return false;
+      setPostcodeLabel(label);
+      setPostcodeBounds(bounds);
+      setAddressDetails(null);
+      onAddressChange?.("");
+      onPlaceSelected?.(null);
+      goToStep(2);
+      window.setTimeout(() => {
+        addressSectionRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+      }, 100);
+      return true;
+    }
+
+    async function commitPostcode(raw: string): Promise<boolean> {
+      const trimmed = raw.trim();
+      if (!trimmed || geocoding) return false;
+      if (postcodeBounds) return true;
+
+      setGeocoding(true);
+      try {
+        const parsed = await geocodePostcode(trimmed, countryCode);
+        if (!parsed?.bounds) return false;
+        const label = parsed.zipCode || trimmed;
+        return commitPostcodeFromParsed(label, parsed.bounds);
+      } finally {
+        setGeocoding(false);
+      }
+    }
 
     useEffect(() => {
       let cancelled = false;
@@ -99,6 +147,7 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
       setAddressDetails(null);
       onAddressChange?.("");
       onPlaceSelected?.(null);
+      goToStep(1);
     }
 
     function selectCountry(next: SupportedCountryCode) {
@@ -114,9 +163,9 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
     }
 
     return (
-      <div ref={rootRef} className={`flex min-w-0 flex-1 flex-col gap-3 ${className}`.trim()}>
+      <div ref={rootRef} className={`flex min-w-0 flex-1 flex-col gap-3 overflow-visible ${className}`.trim()}>
         {/* Step 1 — postcode */}
-        <div>
+        <div className="overflow-visible">
           <label htmlFor={postcodeLabelId} className="mb-1.5 block text-sm text-[#A0A0A0]">
             Enter your postcode
           </label>
@@ -182,28 +231,28 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
               )}
             </div>
 
-            {step === 1 && ready ? (
+            {!addressStepActive && ready ? (
               <PlacesAutocompleteInput
                 id={postcodeLabelId}
                 key={`postcode-${countryCode}`}
                 countryCode={countryCode}
                 placeTypes={["postal_code"]}
-                placeholder="e.g. 2000 or SW1A 1AA"
+                placeholder="e.g. 2000 or N12 7JJ"
                 className={`${fieldClass} flex-1 rounded-none sm:rounded-r-lg`}
                 onTextChange={(value) => {
                   setPostcodeLabel(value);
                   setPostcodeBounds(null);
+                  onPostcodeChange?.(value);
+                  goToStep(1);
                 }}
                 onPlaceSelected={(parsed) => {
                   const label = parsed.zipCode || parsed.address;
-                  setPostcodeLabel(label);
-                  setPostcodeBounds(parsed.bounds ?? null);
-                  setAddressDetails(null);
-                  onAddressChange?.("");
-                  onPlaceSelected?.(null);
+                  if (parsed.bounds) {
+                    commitPostcodeFromParsed(label, parsed.bounds);
+                  }
                 }}
               />
-            ) : step === 2 ? (
+            ) : addressStepActive ? (
               <div className="flex min-h-[52px] flex-1 items-center px-4 py-3.5 text-sm text-[#FFFFFF]">
                 {postcodeLabel}
               </div>
@@ -216,7 +265,7 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
               />
             )}
           </div>
-          {step === 2 && postcodeLabel ? (
+          {addressStepActive && postcodeLabel ? (
             <p className="mt-1.5 text-xs text-[#A0A0A0]">
               <button
                 type="button"
@@ -229,20 +278,20 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
           ) : null}
         </div>
 
-        {/* Step 2 — address (only after postcode) */}
-        {step === 2 && postcodeBounds ? (
-          <div>
+        {/* Step 2 — address (after postcode committed) */}
+        {addressStepActive && postcodeBounds ? (
+          <div ref={addressSectionRef} className="overflow-visible">
             <label htmlFor={addressLabelId} className="mb-1.5 block text-sm text-[#A0A0A0]">
               Select your address
             </label>
-            <div className="overflow-hidden rounded-lg border border-border-subtle bg-[#1C1C1C] transition-colors focus-within:border-[#F5A623]">
+            <div className="overflow-visible rounded-lg border border-border-subtle bg-[#1C1C1C] transition-colors focus-within:border-[#F5A623]">
               <PlacesAutocompleteInput
                 id={addressLabelId}
-                key={`address-${countryCode}-${postcodeLabel}`}
+                key={`address-${countryCode}-${postcodeLabel}-${postcodeBounds.north}`}
                 countryCode={countryCode}
                 placeTypes={["address"]}
                 bounds={postcodeBounds}
-                strictBounds
+                strictBounds={false}
                 placeholder="Start typing your street address"
                 className={fieldClass}
                 onTextChange={() => {
@@ -262,6 +311,9 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
                 }}
               />
             </div>
+            <p className="mt-1.5 text-xs text-[#A0A0A0]">
+              Choose an address from the list — type a few characters if suggestions do not appear.
+            </p>
           </div>
         ) : null}
       </div>
