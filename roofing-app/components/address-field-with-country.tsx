@@ -49,9 +49,6 @@ const AddressFieldWithCountry = forwardRef<AddressAutocompleteHandle, AddressFie
         className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border-subtle bg-[#1C1C1C] transition-colors focus-within:border-[#F5A623] sm:flex-row ${className}`.trim()}
       >
         <label className="relative flex shrink-0 items-center border-b border-border-subtle sm:border-b-0 sm:border-r">
-          <span className="pointer-events-none absolute left-3 text-base leading-none" aria-hidden>
-            {selected.flag}
-          </span>
           <select
             value={countryCode}
             onChange={(e) => {
@@ -60,12 +57,12 @@ const AddressFieldWithCountry = forwardRef<AddressAutocompleteHandle, AddressFie
               onAddressChange("");
               console.log("[address-autocomplete] User selected country:", next);
             }}
-            aria-label="Country"
-            className="cursor-pointer appearance-none bg-[#2A2A2A] py-3.5 pl-9 pr-9 text-sm font-medium text-[#FFFFFF] focus:outline-none focus:ring-0"
+            aria-label={`Country (${selected.flag} ${selected.displayCode})`}
+            className="cursor-pointer appearance-none bg-[#2A2A2A] py-3.5 pl-3 pr-9 text-sm font-medium text-[#FFFFFF] focus:outline-none focus:ring-0"
           >
             {SUPPORTED_COUNTRIES.map((c) => (
               <option key={c.code} value={c.code} className="bg-[#2A2A2A] text-[#FFFFFF]">
-                {c.displayCode}
+                {`${c.flag} ${c.displayCode}`}
               </option>
             ))}
           </select>
