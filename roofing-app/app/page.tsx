@@ -8,6 +8,7 @@ import AddressFieldWithCountry, {
   AddressPlaceDetails,
 } from "@/components/address-field-with-country";
 import { hasGoogleMapsKey } from "@/lib/google-maps-script";
+import { isPostcodeInputValid } from "@/lib/postcode-input";
 
 type BootstrapData = {
   settings: {
@@ -68,7 +69,7 @@ export default function Home() {
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const canSubmitPostcode = postcodeInput.trim().length >= 3;
+  const canSubmitPostcode = isPostcodeInputValid(postcodeInput);
   const primaryCtaEnabled =
     addressFlowStep === 1 ? canSubmitPostcode && !loadingPreview : hasValidAddress && !loadingPreview;
 

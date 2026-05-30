@@ -6,7 +6,9 @@ import { detectDefaultSupportedCountry } from "@/lib/detect-country";
 import { geocodePostcode } from "@/lib/geocode-postcode";
 import type { MapBoundsLiteral } from "@/lib/parse-google-place";
 import {
+  geocoderRegionBias,
   getSupportedCountry,
+  postcodePlaceholder,
   SUPPORTED_COUNTRIES,
   type SupportedCountryCode,
 } from "@/lib/supported-countries";
@@ -80,8 +82,7 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
       onStepChange?.(step);
     }
 
-    function commitPostcodeFromParsed(label: string, bounds: MapBoundsLiteral | null) {
-      if (!bounds) return false;
+    function applyPostcodeCommit(label: string, bounds: MapBoundsLiteral) {
       setPostcodeLabel(label);
       setPostcodeBounds(bounds);
       setAddressDetails(null);
@@ -91,7 +92,6 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
       window.setTimeout(() => {
         addressSectionRef.current?.querySelector<HTMLInputElement>("input")?.focus();
       }, 100);
-      return true;
     }
 
     async function commitPostcode(raw: string): Promise<boolean> {
@@ -104,7 +104,14 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
         const parsed = await geocodePostcode(trimmed, countryCode);
         if (!parsed?.bounds) return false;
         const label = parsed.zipCode || trimmed;
-        return commitPostcodeFromParsed(label, parsed.bounds);
+        console.log("[address-flow] Postcode confirmed:", {
+          label,
+          countryCode,
+          geocoderRegion: geocoderRegionBias(countryCode),
+          strictBounds: parsed.bounds,
+        });
+        applyPostcodeCommit(label, parsed.bounds);
+        return true;
       } finally {
         setGeocoding(false);
       }
@@ -154,7 +161,11 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
       setCountryCode(next);
       setMenuOpen(false);
       resetToPostcodeStep();
-      console.log("[address-autocomplete] User selected country:", next);
+      console.log("[address-flow] Country selected:", {
+        countryCode: next,
+        geocoderRegion: geocoderRegionBias(next),
+        placesRestriction: { country: next },
+      });
     }
 
     function notifyAddress(details: AddressPlaceDetails | null) {
@@ -236,8 +247,9 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
                 id={postcodeLabelId}
                 key={`postcode-${countryCode}`}
                 countryCode={countryCode}
-                placeTypes={["postal_code"]}
-                placeholder="e.g. 2000 or N12 7JJ"
+                placeTypes={["(regions)"]}
+                placeholder={postcodePlaceholder(countryCode)}
+                autoComplete="postal-code"
                 className={`${fieldClass} flex-1 rounded-none sm:rounded-r-lg`}
                 onTextChange={(value) => {
                   setPostcodeLabel(value);
@@ -247,9 +259,7 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
                 }}
                 onPlaceSelected={(parsed) => {
                   const label = parsed.zipCode || parsed.address;
-                  if (parsed.bounds) {
-                    commitPostcodeFromParsed(label, parsed.bounds);
-                  }
+                  void commitPostcode(label);
                 }}
               />
             ) : addressStepActive ? (
@@ -291,7 +301,7 @@ const PostcodeAddressField = forwardRef<PostcodeAddressFieldHandle, PostcodeAddr
                 countryCode={countryCode}
                 placeTypes={["address"]}
                 bounds={postcodeBounds}
-                strictBounds={false}
+                strictBounds
                 placeholder="Start typing your street address"
                 className={fieldClass}
                 onTextChange={() => {

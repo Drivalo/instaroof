@@ -10,10 +10,11 @@ type PlacesAutocompleteInputProps = {
   countryCode: SupportedCountryCode;
   placeTypes: string[];
   bounds?: MapBoundsLiteral;
-  /** When true, only results inside bounds (often too strict for postcodes). Default: bias only. */
+  /** When true, only results inside bounds (required for postcode-scoped address search). */
   strictBounds?: boolean;
   placeholder: string;
   className?: string;
+  autoComplete?: string;
   disabled?: boolean;
   onTextChange: (value: string) => void;
   onPlaceSelected: (details: ParsedPlaceDetails) => void;
@@ -33,6 +34,7 @@ export function PlacesAutocompleteInput({
   strictBounds = false,
   placeholder,
   className,
+  autoComplete = "off",
   disabled = false,
   onTextChange,
   onPlaceSelected,
@@ -73,6 +75,8 @@ export function PlacesAutocompleteInput({
         if (bounds) {
           options.bounds = toLatLngBounds(bounds);
           options.strictBounds = strictBounds;
+        } else if (strictBounds) {
+          console.warn("[places-autocomplete] strictBounds requested but no bounds provided");
         }
 
         const instance = new window.google.maps.places.Autocomplete(inputRef.current, options);
@@ -80,7 +84,7 @@ export function PlacesAutocompleteInput({
 
         console.log("[places-autocomplete] initialized", {
           types: placeTypes,
-          country: countryCode,
+          componentRestrictions: { country: countryCode },
           bounds: bounds ?? null,
           strictBounds: Boolean(bounds && strictBounds),
         });
@@ -106,9 +110,12 @@ export function PlacesAutocompleteInput({
     const instance = autocompleteRef.current;
     if (!instance) return;
     instance.setComponentRestrictions?.({ country: countryCode });
+    console.log("[places-autocomplete] componentRestrictions updated:", { country: countryCode });
     if (bounds && instance.setBounds) {
-      instance.setBounds(toLatLngBounds(bounds));
-      instance.setOptions?.({ strictBounds });
+      const latLngBounds = toLatLngBounds(bounds);
+      instance.setBounds(latLngBounds);
+      instance.setOptions?.({ strictBounds: Boolean(strictBounds) });
+      console.log("[places-autocomplete] bounds updated:", { bounds, strictBounds: Boolean(strictBounds) });
     }
   }, [countryCode, bounds, strictBounds]);
 
@@ -117,7 +124,7 @@ export function PlacesAutocompleteInput({
       id={inputId}
       ref={inputRef}
       type="text"
-      autoComplete="off"
+      autoComplete={autoComplete}
       disabled={disabled}
       className={className}
       placeholder={placeholder}
