@@ -59,9 +59,6 @@ export function PlacesAutocompleteInput({
     if (disabled || !inputRef.current) return;
 
     let cancelled = false;
-    const boundsKey = bounds
-      ? `${bounds.north},${bounds.south},${bounds.east},${bounds.west}`
-      : "none";
 
     loadGoogleMapsScript()
       .then(() => {
@@ -103,7 +100,7 @@ export function PlacesAutocompleteInput({
       cancelled = true;
       autocompleteRef.current = null;
     };
-  }, [disabled, placeTypes.join(","), countryCode, boundsKey, strictBounds]);
+  }, [disabled, placeTypes.join(","), countryCode, bounds, strictBounds]);
 
   useEffect(() => {
     const instance = autocompleteRef.current;
