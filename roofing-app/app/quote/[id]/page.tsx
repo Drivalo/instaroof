@@ -528,39 +528,69 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         <div className="grid md:grid-cols-3 gap-4 mt-6">
           <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
             <h3>Repair Estimate</h3>
-            <p className="text-2xl mt-2 text-foreground">
-              {formatQuotePriceRange(
-                lead.quote_repair_low,
-                lead.quote_repair_high,
-                customerAddress,
-                settings,
-                customerCountry,
-              )}
-            </p>
+            <div className="relative mt-2 min-h-[2.75rem]">
+              <p
+                className={`text-2xl text-foreground ${!detailsUnlocked ? "blur-[16px] select-none" : ""}`}
+                aria-hidden={!detailsUnlocked}
+              >
+                {formatQuotePriceRange(
+                  lead.quote_repair_low,
+                  lead.quote_repair_high,
+                  customerAddress,
+                  settings,
+                  customerCountry,
+                )}
+              </p>
+              {!detailsUnlocked ? (
+                <p className="absolute inset-0 flex items-center justify-center px-2 text-center text-sm font-medium leading-snug text-foreground">
+                  Enter your details to reveal your quote
+                </p>
+              ) : null}
+            </div>
           </div>
           <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
             <h3>Full Replacement - Standard</h3>
-            <p className="text-2xl mt-2 text-foreground">
-              {formatQuotePriceRange(
-                lead.quote_standard_low,
-                lead.quote_standard_high,
-                customerAddress,
-                settings,
-                customerCountry,
-              )}
-            </p>
+            <div className="relative mt-2 min-h-[2.75rem]">
+              <p
+                className={`text-2xl text-foreground ${!detailsUnlocked ? "blur-[16px] select-none" : ""}`}
+                aria-hidden={!detailsUnlocked}
+              >
+                {formatQuotePriceRange(
+                  lead.quote_standard_low,
+                  lead.quote_standard_high,
+                  customerAddress,
+                  settings,
+                  customerCountry,
+                )}
+              </p>
+              {!detailsUnlocked ? (
+                <p className="absolute inset-0 flex items-center justify-center px-2 text-center text-sm font-medium leading-snug text-foreground">
+                  Enter your details to reveal your quote
+                </p>
+              ) : null}
+            </div>
           </div>
           <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
             <h3>Full Replacement - Premium</h3>
-            <p className="text-2xl mt-2 text-foreground">
-              {formatQuotePriceRange(
-                lead.quote_premium_low,
-                lead.quote_premium_high,
-                customerAddress,
-                settings,
-                customerCountry,
-              )}
-            </p>
+            <div className="relative mt-2 min-h-[2.75rem]">
+              <p
+                className={`text-2xl text-foreground ${!detailsUnlocked ? "blur-[16px] select-none" : ""}`}
+                aria-hidden={!detailsUnlocked}
+              >
+                {formatQuotePriceRange(
+                  lead.quote_premium_low,
+                  lead.quote_premium_high,
+                  customerAddress,
+                  settings,
+                  customerCountry,
+                )}
+              </p>
+              {!detailsUnlocked ? (
+                <p className="absolute inset-0 flex items-center justify-center px-2 text-center text-sm font-medium leading-snug text-foreground">
+                  Enter your details to reveal your quote
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
