@@ -5,6 +5,7 @@ import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { SatelliteRoofMap } from "@/components/satellite-roof-map";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
 import { formatRoofAreaLabel, formatRoofSquares, usesImperialRoofDisplay } from "@/lib/roof-estimate";
 import { SettingsRow } from "@/lib/types";
 
@@ -154,6 +155,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [inspectionSlot, setInspectionSlot] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [jobType, setJobType] = useState<JobType | "">("");
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -201,8 +203,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     const name = String(lead.name ?? "");
     const email = String(lead.email ?? "");
     const phone = String(lead.phone ?? "");
+    const savedJobType = lead.job_type;
     setContact({ name, email, phone });
-    if (name.trim() && isValidEmail(email) && isValidPhone(phone)) {
+    if (isValidJobType(savedJobType)) setJobType(savedJobType);
+    if (
+      name.trim() &&
+      isValidEmail(email) &&
+      isValidPhone(phone) &&
+      isValidJobType(savedJobType)
+    ) {
       setDetailsUnlocked(true);
     }
   }, [lead]);
@@ -211,6 +220,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     contact.name.trim().length > 0 &&
     isValidEmail(contact.email) &&
     isValidPhone(contact.phone) &&
+    isValidJobType(jobType) &&
     privacyConsent;
 
   async function saveContactDetails(): Promise<boolean> {
@@ -238,6 +248,10 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       alert("Please agree to the privacy policy before continuing.");
       return false;
     }
+    if (!isValidJobType(jobType)) {
+      alert("Please select what best describes your situation.");
+      return false;
+    }
 
     if (!id) {
       console.error("[quote] saveContactDetails blocked — lead id not loaded yet");
@@ -250,7 +264,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       const res = await fetch(`/api/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone }),
+        body: JSON.stringify({ name, email, phone, job_type: jobType }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -395,6 +409,25 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             <p className="mt-2 text-sm text-muted leading-relaxed">
               Enter your details to see your full price breakdown
             </p>
+            <div className="mt-6 space-y-3">
+              <p id="job-type-label" className="text-sm text-muted">
+                What best describes your situation?
+              </p>
+              <div className="space-y-2" role="radiogroup" aria-labelledby="job-type-label">
+                {JOB_TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={jobType === opt.value}
+                    onClick={() => setJobType(opt.value)}
+                    className={jobType === opt.value ? slotButtonSelected : slotButtonBase}
+                  >
+                    {opt.emoji} {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-6 space-y-4">
               <div>
                 <label htmlFor="modal-quote-name" className="block text-sm text-muted mb-1.5">

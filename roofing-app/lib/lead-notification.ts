@@ -8,6 +8,7 @@ import {
   formatRoofAreaDisplay,
   previewPriceRangeFromEstimate,
 } from "@/lib/roof-estimate";
+import { isEmergencyJobType, jobTypeLabel } from "@/lib/job-type";
 import { getSettings, getSupabaseAdmin } from "@/lib/supabase";
 import { SettingsRow } from "@/lib/types";
 
@@ -29,6 +30,7 @@ type LeadRecord = {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
+  job_type?: string | null;
   address: string;
   country_code?: string | null;
   latitude?: number | null;
@@ -140,16 +142,26 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Inspection time</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${appointment.time}</td></tr>`
     : "";
 
+  const urgentBanner = isEmergencyJobType(lead.job_type)
+    ? `<div style="background:#fef3c7;border:2px solid #f59e0b;padding:14px 16px;border-radius:8px;margin:0 0 16px;font-size:15px;font-weight:600;color:#92400e;">⚠️ URGENT — customer has an active leak.</div>`
+    : "";
+
+  const jobTypeRow = lead.job_type
+    ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Situation</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${jobTypeLabel(lead.job_type)}</td></tr>`
+    : "";
+
   return `
 <!DOCTYPE html>
 <html>
 <body style="font-family:system-ui,sans-serif;color:#1c1c1c;line-height:1.5;margin:0;padding:24px;">
   <h1 style="font-size:20px;margin:0 0 16px;">New lead notification</h1>
+  ${urgentBanner}
   ${contextNote}
   <table style="border-collapse:collapse;width:100%;max-width:560px;margin-top:16px;">
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;width:140px;"><strong>Name</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.name)}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Email</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.email)}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Phone</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.phone)}</td></tr>
+    ${jobTypeRow}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Address</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.address}</td></tr>
     ${appointmentRows}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Roof size</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${roofSize}</td></tr>
@@ -166,12 +178,18 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
 
 function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: string) {
   const appointment = formatAppointment(lead);
+  const urgentLine = isEmergencyJobType(lead.job_type)
+    ? ["⚠️ URGENT — customer has an active leak.", ""]
+    : [];
+  const jobTypeLine = lead.job_type ? [`Situation: ${jobTypeLabel(lead.job_type)}`] : [];
   return [
     "New lead notification",
     "",
+    ...urgentLine,
     `Name: ${displayValue(lead.name)}`,
     `Email: ${displayValue(lead.email)}`,
     `Phone: ${displayValue(lead.phone)}`,
+    ...jobTypeLine,
     `Address: ${lead.address}`,
     ...(appointment
       ? [`Inspection date: ${appointment.date}`, `Inspection time: ${appointment.time}`]

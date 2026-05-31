@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS leads (
   name TEXT,
   email TEXT,
   phone TEXT,
+  job_type TEXT,
   best_time_to_contact TEXT,
   inspection_datetime TIMESTAMPTZ,
   stripe_payment_id TEXT,

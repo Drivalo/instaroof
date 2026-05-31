@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import { mapRowToLeadRecord, sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
+import { isValidJobType } from "@/lib/job-type";
 import { satelliteImageSrcForLead } from "@/lib/maps-static";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
@@ -26,15 +27,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const { name, email, phone } = body;
+    const { name, email, phone, job_type } = body;
 
     const updates: Record<string, string> = {};
     if (typeof name === "string" && name.trim()) updates.name = name.trim();
     if (typeof email === "string" && email.trim()) updates.email = email.trim();
     if (typeof phone === "string" && phone.trim()) updates.phone = phone.trim();
+    if (isValidJobType(job_type)) updates.job_type = job_type;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    const savingContact = Boolean(updates.name && updates.email && updates.phone);
+    if (savingContact && !updates.job_type) {
+      return NextResponse.json({ error: "Please select what best describes your situation" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
