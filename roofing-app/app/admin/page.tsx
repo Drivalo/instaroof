@@ -3,6 +3,7 @@
 import { format } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { getCurrencyDisplay } from "@/lib/currency";
+import { formatRoofAreaLabel } from "@/lib/roof-estimate";
 import { SettingsRow } from "@/lib/types";
 
 type LeadRow = {
@@ -219,7 +220,7 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3 text-foreground">{lead.address}</td>
                     <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                      {roofSizeSqm(lead.roof_sqft)}
+                      {formatRoofAreaLabel(lead.roof_sqft, lead.country_code, lead.address)}
                     </td>
                     <td className="px-4 py-3 text-foreground whitespace-nowrap">
                       {formatPriceRange(lead, settings)}

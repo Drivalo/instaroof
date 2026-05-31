@@ -5,6 +5,7 @@ import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { SatelliteRoofMap } from "@/components/satellite-roof-map";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatRoofAreaLabel, formatRoofSquares, usesImperialRoofDisplay } from "@/lib/roof-estimate";
 import { SettingsRow } from "@/lib/types";
 
 const contactFieldClass =
@@ -171,10 +172,21 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       .catch((err) => console.error("quote page load failed:", err));
   }, [id]);
 
-  const squares = useMemo(() => (lead?.roof_sqft ? (Number(lead.roof_sqft) / 100).toFixed(1) : "0"), [lead]);
-
   const customerAddress = String(lead?.address ?? "");
   const customerCountry = lead?.country_code != null ? String(lead.country_code) : null;
+
+  const imperialRoofMeasurements = useMemo(
+    () => usesImperialRoofDisplay(customerCountry, customerAddress),
+    [customerCountry, customerAddress],
+  );
+
+  const roofAreaDisplay = useMemo(() => {
+    const sqft = lead?.roof_sqft;
+    return {
+      area: formatRoofAreaLabel(sqft, customerCountry, customerAddress, "—"),
+      squares: formatRoofSquares(sqft, customerCountry, customerAddress),
+    };
+  }, [lead?.roof_sqft, customerCountry, customerAddress]);
 
   useEffect(() => {
     if (!lead) return;
@@ -548,12 +560,18 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       </p>
 
       <div className="grid md:grid-cols-2 gap-3 mt-4">
-        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
-          Estimated roof area: <strong>{lead.roof_sqft ?? "—"} sq ft</strong>
+        <p
+          className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
+            !imperialRoofMeasurements ? "md:col-span-2" : ""
+          }`}
+        >
+          Estimated roof area: <strong>{roofAreaDisplay.area}</strong>
         </p>
-        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
-          Estimated squares: <strong>{squares}</strong>
-        </p>
+        {imperialRoofMeasurements ? (
+          <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+            Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
+          </p>
+        ) : null}
         <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
           Detected roof type: <strong>{lead.roof_type ?? "—"}</strong>
         </p>

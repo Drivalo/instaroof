@@ -36,19 +36,32 @@ export function estimateRoofSqftFromCoordinates(lat: number, lng: number): numbe
   return Math.max(900, Math.min(4500, sqft));
 }
 
-export function usesMetricRoofDisplay(address?: string | null, countryCode?: string | null): boolean {
+/** US and Canada: sq ft and roofing squares (100 sq ft). All other markets: m² only. */
+export function usesImperialRoofDisplay(
+  countryCode?: string | null,
+  address?: string | null,
+): boolean {
   const code = String(countryCode ?? "").trim().toUpperCase();
-  if (code === "GB" || code === "UK" || code === "AU" || code === "NZ" || code === "CA") return true;
+  if (code === "US" || code === "CA") return true;
+  if (code) return false;
+
   const addr = String(address ?? "").toLowerCase();
-  return (
-    addr.includes(", uk") ||
-    addr.endsWith(" uk") ||
-    addr.includes("united kingdom") ||
-    addr.includes("australia") ||
-    addr.includes("new zealand") ||
-    addr.includes("canada")
-  );
+  const raw = String(address ?? "").trim();
+  if (
+    /\b(usa|u\.s\.a\.|united states|u\.s\.)\b/i.test(addr) ||
+    /,\s*(usa|united states)\s*$/i.test(raw)
+  ) {
+    return true;
+  }
+  if (/\b(canada)\b/i.test(addr) || /,\s*canada\s*$/i.test(raw)) return true;
+  return false;
 }
+
+export function usesMetricRoofDisplay(address?: string | null, countryCode?: string | null): boolean {
+  return !usesImperialRoofDisplay(countryCode, address);
+}
+
+const SQFT_PER_SQM = 0.092903;
 
 export function formatRoofAreaDisplay(
   roofSqft: number,
@@ -56,7 +69,7 @@ export function formatRoofAreaDisplay(
   countryCode?: string | null,
 ): { roof_sqft: number; value: number; unit: string; label: string } {
   if (usesMetricRoofDisplay(address, countryCode)) {
-    const sqm = Math.round(roofSqft * 0.092903);
+    const sqm = Math.round(roofSqft * SQFT_PER_SQM);
     return { roof_sqft: roofSqft, value: sqm, unit: "m²", label: `${sqm.toLocaleString("en-US")} m²` };
   }
   return {
@@ -65,6 +78,28 @@ export function formatRoofAreaDisplay(
     unit: "sq ft",
     label: `${roofSqft.toLocaleString("en-US")} sq ft`,
   };
+}
+
+/** Single display string from stored roof_sqft (internal) for the lead's country. */
+export function formatRoofAreaLabel(
+  roofSqft: number | null | undefined,
+  countryCode?: string | null,
+  address?: string | null,
+  emptyLabel = "—",
+): string {
+  if (roofSqft == null || !Number.isFinite(Number(roofSqft))) return emptyLabel;
+  return formatRoofAreaDisplay(Number(roofSqft), address, countryCode).label;
+}
+
+/** Roofing squares (100 sq ft) for US/CA only; null when not used in that market. */
+export function formatRoofSquares(
+  roofSqft: number | null | undefined,
+  countryCode?: string | null,
+  address?: string | null,
+): string | null {
+  if (!usesImperialRoofDisplay(countryCode, address)) return null;
+  if (roofSqft == null || !Number.isFinite(Number(roofSqft))) return null;
+  return (Number(roofSqft) / 100).toFixed(1);
 }
 
 export function previewMaterialForRegion(address?: string | null, countryCode?: string | null): string {

@@ -6,6 +6,7 @@ import { ensureEnvLoaded } from "@/lib/env.server";
 import {
   estimateRoofSqftFromAddress,
   estimateRoofSqftFromCoordinates,
+  formatRoofAreaLabel,
   previewPriceRangeFromEstimate,
 } from "@/lib/roof-estimate";
 import { getSettings, getSupabaseAdmin } from "@/lib/supabase";
@@ -61,11 +62,10 @@ function resolveRoofSqft(lead: LeadRecord): number | null {
   return null;
 }
 
-function formatRoofSizeSqm(lead: LeadRecord): string {
+function formatRoofSizeForLead(lead: LeadRecord): string {
   const sqft = resolveRoofSqft(lead);
   if (sqft == null) return "Being calculated";
-  const sqm = Math.round(sqft * 0.092903);
-  return `${sqm.toLocaleString("en-US")} m²`;
+  return formatRoofAreaLabel(sqft, lead.country_code, lead.address, "Being calculated");
 }
 
 function formatPriceRange(lead: LeadRecord, settings: SettingsRow): string {
@@ -175,7 +175,7 @@ function buildHtml(
   quoteUrl: string,
   firstName: string,
 ) {
-  const roofSize = formatRoofSizeSqm(lead);
+  const roofSize = formatRoofSizeForLead(lead);
   const priceRange = formatPriceRange(lead, settings);
   const companyName = settings.company_name || "your roofing company";
   const booked = hasInspectionBooking(lead);
@@ -293,7 +293,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
   }
 
   lines.push(
-    `Estimated roof size: ${formatRoofSizeSqm(lead)}`,
+    `Estimated roof size: ${formatRoofSizeForLead(lead)}`,
     `Estimated price range: ${formatPriceRange(lead, settings)}`,
     "",
   );

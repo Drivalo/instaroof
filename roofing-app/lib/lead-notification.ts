@@ -69,12 +69,10 @@ function resolveRoofSqft(lead: LeadRecord): number | null {
   return null;
 }
 
-function formatRoofSizeSqm(lead: LeadRecord): string {
+function formatRoofSizeForLead(lead: LeadRecord): string {
   const sqft = resolveRoofSqft(lead);
   if (sqft == null) return "Pending analysis";
-  const area = formatRoofAreaDisplay(sqft, lead.address, lead.country_code);
-  const sqm = Math.round(sqft * 0.092903);
-  return `${sqm.toLocaleString("en-US")} m² (${area.label})`;
+  return formatRoofAreaDisplay(sqft, lead.address, lead.country_code).label;
 }
 
 function formatEstimatedPriceRange(lead: LeadRecord, settings: SettingsRow): string {
@@ -124,7 +122,7 @@ function subjectForContext(lead: LeadRecord, context: LeadNotificationContext): 
 }
 
 function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: string, context: LeadNotificationContext) {
-  const roofSize = formatRoofSizeSqm(lead);
+  const roofSize = formatRoofSizeForLead(lead);
   const priceRange = formatEstimatedPriceRange(lead, settings);
   const appointment = formatAppointment(lead);
 
@@ -178,7 +176,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     ...(appointment
       ? [`Inspection date: ${appointment.date}`, `Inspection time: ${appointment.time}`]
       : []),
-    `Roof size: ${formatRoofSizeSqm(lead)}`,
+    `Roof size: ${formatRoofSizeForLead(lead)}`,
     `Price range: ${formatEstimatedPriceRange(lead, settings)}`,
     `Status: ${displayValue(lead.status)}`,
     "",
