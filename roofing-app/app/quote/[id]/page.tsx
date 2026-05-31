@@ -24,12 +24,6 @@ function isValidPhone(value: string) {
   return digits.length >= 7 && digits.length <= 15;
 }
 
-function isValidPhoneOptional(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return true;
-  return isValidPhone(trimmed);
-}
-
 type QuoteCurrency = "GB" | "AU" | "NZ" | "US";
 
 /** UK: "UK", "uk", "United Kingdom", or country code GB (case-insensitive). */
@@ -179,7 +173,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     const email = String(lead.email ?? "");
     const phone = String(lead.phone ?? "");
     setContact({ name, email, phone });
-    if (name.trim() && isValidEmail(email) && isValidPhoneOptional(phone)) {
+    if (name.trim() && isValidEmail(email) && isValidPhone(phone)) {
       setDetailsUnlocked(true);
     }
   }, [lead]);
@@ -187,7 +181,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const contactReady =
     contact.name.trim().length > 0 &&
     isValidEmail(contact.email) &&
-    isValidPhoneOptional(contact.phone) &&
+    isValidPhone(contact.phone) &&
     privacyConsent;
 
   async function saveContactDetails(): Promise<boolean> {
@@ -203,7 +197,11 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       alert("Please enter a valid email address.");
       return false;
     }
-    if (!isValidPhoneOptional(phone)) {
+    if (!phone) {
+      alert("Please enter your phone number.");
+      return false;
+    }
+    if (!isValidPhone(phone)) {
       alert("Please enter a valid phone number.");
       return false;
     }
@@ -401,11 +399,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               </div>
               <div>
                 <label htmlFor="modal-quote-phone" className="block text-sm text-muted mb-1.5">
-                  Phone (optional)
+                  Phone number
                 </label>
                 <input
                   id="modal-quote-phone"
                   type="tel"
+                  required
                   autoComplete="tel"
                   className={contactFieldClass}
                   placeholder="Phone number"
