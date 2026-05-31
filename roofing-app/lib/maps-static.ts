@@ -6,8 +6,8 @@ export function getGoogleMapsApiKey(override?: string | null): string | undefine
   return readEnv("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY");
 }
 
-/** Max practical zoom for roof detail on Google Static Maps (closer than 20). */
-export const SATELLITE_STATIC_ZOOM = 21;
+/** Zoom for Static Maps — 21 often returns blank grey tiles where aerial imagery is unavailable. */
+export const SATELLITE_STATIC_ZOOM = 19;
 
 export function maskGoogleMapsKeyInUrl(url: string) {
   return url.replace(/key=[^&]+/, "key=***");

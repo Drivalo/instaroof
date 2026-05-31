@@ -8,29 +8,44 @@ declare global {
   }
 }
 
+function isMapsCoreReady(): boolean {
+  return typeof window.google?.maps?.Map === "function";
+}
+
+function isPlacesReady(): boolean {
+  return Boolean(window.google?.maps?.places);
+}
+
 export function hasGoogleMapsKey() {
   return Boolean(GOOGLE_MAPS_KEY);
 }
 
-export function loadGoogleMapsScript(): Promise<void> {
+type LoadGoogleMapsOptions = {
+  /** When true, waits for the Places library (autocomplete). When false, only the core Map API. */
+  requirePlaces?: boolean;
+};
+
+export function loadGoogleMapsScript(options: LoadGoogleMapsOptions = {}): Promise<void> {
+  const { requirePlaces = true } = options;
+
   if (!GOOGLE_MAPS_KEY) {
     return Promise.reject(new Error("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not set"));
   }
 
-  if (window.google?.maps?.places) {
+  if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) {
     return Promise.resolve();
   }
 
   const existing = document.querySelector<HTMLScriptElement>('script[data-instaroof-maps="true"]');
   if (existing) {
     return new Promise((resolve, reject) => {
-      if (window.google?.maps?.places) {
+      if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) {
         resolve();
         return;
       }
       const onReady = () => {
-        if (window.google?.maps?.places) resolve();
-        else reject(new Error("Google Places library unavailable"));
+        if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) resolve();
+        else reject(new Error("Google Maps library unavailable"));
       };
       window.instaroofMapsInit = onReady;
       existing.addEventListener("load", onReady, { once: true });
@@ -42,8 +57,8 @@ export function loadGoogleMapsScript(): Promise<void> {
 
   return new Promise((resolve, reject) => {
     window.instaroofMapsInit = () => {
-      if (window.google?.maps?.places) resolve();
-      else reject(new Error("Google Places library unavailable"));
+      if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) resolve();
+      else reject(new Error("Google Maps library unavailable"));
     };
 
     const script = document.createElement("script");

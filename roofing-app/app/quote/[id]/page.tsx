@@ -444,8 +444,26 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {satelliteSrc ? (
-        <SatelliteRoofMap src={satelliteSrc} onImageReady={() => setSatelliteReady(true)} />
+      {lead?.latitude != null && lead?.longitude != null ? (
+        <SatelliteRoofMap
+          latitude={Number(lead.latitude)}
+          longitude={Number(lead.longitude)}
+          fallbackSrc={satelliteSrc || undefined}
+          onImageReady={() => setSatelliteReady(true)}
+        />
+      ) : satelliteSrc ? (
+        <div className="relative w-full max-w-[600px] h-[300px] md:h-[400px] min-h-[300px] overflow-hidden rounded-xl border border-border-subtle bg-[#2A2A2A]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={satelliteSrc}
+            alt="Satellite view of property"
+            width={600}
+            height={600}
+            className="h-full w-full object-cover"
+            onLoad={() => setSatelliteReady(true)}
+            onError={() => setSatelliteReady(true)}
+          />
+        </div>
       ) : (
         <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
           Satellite image unavailable
