@@ -110,6 +110,10 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
                 Your refundable deposit has been received. A confirmation email is on its way with
                 your appointment details.
               </p>
+              <p className="mt-3 text-xs text-muted leading-relaxed">
+                Can&apos;t find your confirmation email? Please check your spam or junk folder and
+                mark it as &apos;not spam&apos; to ensure you receive future updates.
+              </p>
               {appointment && (
                 <div className="mt-8 rounded-lg border border-border-subtle bg-background p-6 text-left text-sm space-y-3">
                   <p className="text-foreground">
