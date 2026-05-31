@@ -1,48 +1,72 @@
 "use client";
 
 import { format } from "date-fns";
-import { useCallback, useEffect, useState } from "react";
-import { getCurrencyDisplay } from "@/lib/currency";
-import { formatRoofAreaLabel } from "@/lib/roof-estimate";
-import { SettingsRow } from "@/lib/types";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ADMIN_LEAD_STATUS_OPTIONS,
+  normalizeAdminLeadStatus,
+  type AdminLeadStatus,
+} from "@/lib/admin-lead-status";
+import { isEmergencyJobType, jobTypeEmoji, type JobType } from "@/lib/job-type";
 
-type LeadRow = {
+type AdminLead = {
   id: number;
   created_at: string;
   name: string | null;
   email: string | null;
   phone: string | null;
   address: string;
-  country_code: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  roof_sqft: number | null;
-  quote_standard_low: number | null;
-  quote_standard_high: number | null;
-  status: string;
+  job_type: string | null;
+  status: string | null;
+  notes: string | null;
+  country_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  roof_sqft?: number | null;
+  quote_standard_low?: number | null;
+  quote_standard_high?: number | null;
+  inspection_datetime?: string | null;
+  deposit_paid?: boolean | null;
+  best_time_to_contact?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
 };
 
-function roofSizeSqm(roofSqft: number | null | undefined): string {
-  if (roofSqft == null || !Number.isFinite(Number(roofSqft))) return "—";
-  const sqm = Math.round(Number(roofSqft) * 0.092903);
-  return `${sqm.toLocaleString("en-US")} m²`;
-}
+type StatusFilter = "all" | AdminLeadStatus;
+type JobTypeFilter = "all" | JobType;
 
-function formatPriceRange(lead: LeadRow, settings: SettingsRow | null): string {
-  const low = lead.quote_standard_low;
-  const high = lead.quote_standard_high;
-  if (low == null && high == null) return "—";
-  const display = getCurrencyDisplay(
-    lead.address,
-    settings,
-    lead.country_code,
-    lead.latitude,
-    lead.longitude,
-  );
-  return display.formatRange(low ?? 0, high ?? 0);
+const JOB_TYPE_FILTERS: ReadonlyArray<{ value: JobTypeFilter; label: string }> = [
+  { value: "all", label: "All job types" },
+  { value: "emergency", label: "Emergency" },
+  { value: "planned", label: "Planned" },
+  { value: "insurance", label: "Insurance" },
+];
+
+const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
+  { value: "all", label: "All statuses" },
+  ...ADMIN_LEAD_STATUS_OPTIONS.map((o) => ({ value: o.value as StatusFilter, label: o.label })),
+];
+
+const inputClass =
+  "w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent";
+const selectClass =
+  "rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent";
+
+function displayValue(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed || "—";
 }
 
 function formatSubmittedAt(iso: string): string {
+  try {
+    return format(new Date(iso), "MMM d, yyyy");
+  } catch {
+    return iso;
+  }
+}
+
+function formatSubmittedAtDetail(iso: string): string {
   try {
     return format(new Date(iso), "MMM d, yyyy h:mm a");
   } catch {
@@ -56,8 +80,14 @@ export default function AdminPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loginError, setLoginError] = useState("");
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const [settings, setSettings] = useState<SettingsRow | null>(null);
+  const [leads, setLeads] = useState<AdminLead[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [jobTypeFilter, setJobTypeFilter] = useState<JobTypeFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [notesDraft, setNotesDraft] = useState<Record<number, string>>({});
+  const [savingNotesId, setSavingNotesId] = useState<number | null>(null);
+  const [savingStatusId, setSavingStatusId] = useState<number | null>(null);
 
   const loadLeads = useCallback(async () => {
     setLoadingLeads(true);
@@ -72,8 +102,11 @@ export default function AdminPage() {
       if (!res.ok) {
         throw new Error(data.error || "Failed to load leads");
       }
-      setLeads(data.leads ?? []);
-      setSettings(data.settings ?? null);
+      const rows = (data.leads ?? []) as AdminLead[];
+      setLeads(rows);
+      setNotesDraft(
+        Object.fromEntries(rows.map((l) => [l.id, l.notes ?? ""])),
+      );
       setAuthed(true);
       return true;
     } catch (err) {
@@ -88,6 +121,67 @@ export default function AdminPage() {
   useEffect(() => {
     void loadLeads().finally(() => setCheckingSession(false));
   }, [loadLeads]);
+
+  const filteredLeads = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return leads.filter((lead) => {
+      if (statusFilter !== "all" && normalizeAdminLeadStatus(lead.status) !== statusFilter) {
+        return false;
+      }
+      if (jobTypeFilter !== "all" && lead.job_type !== jobTypeFilter) {
+        return false;
+      }
+      if (q) {
+        const name = (lead.name ?? "").toLowerCase();
+        const address = lead.address.toLowerCase();
+        if (!name.includes(q) && !address.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [leads, statusFilter, jobTypeFilter, searchQuery]);
+
+  async function patchLead(
+    leadId: number,
+    patch: { status?: AdminLeadStatus; notes?: string },
+  ): Promise<boolean> {
+    const res = await fetch(`/api/admin/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setLoginError(data.error || "Failed to update lead");
+      return false;
+    }
+    if (data.lead) {
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, ...data.lead } : l)));
+    }
+    return true;
+  }
+
+  async function handleStatusChange(leadId: number, status: AdminLeadStatus) {
+    setSavingStatusId(leadId);
+    setLoginError("");
+    const ok = await patchLead(leadId, { status });
+    if (!ok) await loadLeads();
+    setSavingStatusId(null);
+  }
+
+  async function saveNotes(leadId: number) {
+    const notes = notesDraft[leadId] ?? "";
+    const lead = leads.find((l) => l.id === leadId);
+    if (lead && (lead.notes ?? "") === notes) return;
+
+    setSavingNotesId(leadId);
+    setLoginError("");
+    const ok = await patchLead(leadId, { notes });
+    if (!ok) {
+      const current = leads.find((l) => l.id === leadId);
+      if (current) setNotesDraft((d) => ({ ...d, [leadId]: current.notes ?? "" }));
+    }
+    setSavingNotesId(null);
+  }
 
   async function login(e: React.FormEvent) {
     e.preventDefault();
@@ -110,7 +204,7 @@ export default function AdminPage() {
     await fetch("/api/admin/logout", { method: "POST" });
     setAuthed(false);
     setLeads([]);
-    setSettings(null);
+    setExpandedId(null);
   }
 
   if (checkingSession) {
@@ -140,7 +234,7 @@ export default function AdminPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-border-subtle bg-surface px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent"
+                className={inputClass}
                 placeholder="Admin password"
               />
             </div>
@@ -161,7 +255,11 @@ export default function AdminPage() {
           <div>
             <h1 className="text-2xl">Leads</h1>
             <p className="mt-1 text-sm text-muted">
-              {leads.length} {leads.length === 1 ? "lead" : "leads"} · newest first
+              <span className="text-foreground font-medium">{filteredLeads.length}</span>
+              {filteredLeads.length === 1 ? " lead" : " leads"}
+              {statusFilter !== "all" || jobTypeFilter !== "all" || searchQuery.trim()
+                ? " matching filters"
+                : " total"}
             </p>
           </div>
           <div className="flex gap-3">
@@ -184,62 +282,252 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="container-max py-8">
-        {loginError ? <p className="mb-4 text-sm text-red-400">{loginError}</p> : null}
+      <div className="container-max py-6 space-y-4">
+        {loginError ? <p className="text-sm text-red-400">{loginError}</p> : null}
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label htmlFor="admin-search" className="block text-sm text-muted mb-1.5">
+              Search name or address
+            </label>
+            <input
+              id="admin-search"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={inputClass}
+              placeholder="Start typing…"
+            />
+          </div>
+          <div>
+            <label htmlFor="admin-status-filter" className="block text-sm text-muted mb-1.5">
+              Status
+            </label>
+            <select
+              id="admin-status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              className={selectClass}
+            >
+              {STATUS_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="admin-job-filter" className="block text-sm text-muted mb-1.5">
+              Job type
+            </label>
+            <select
+              id="admin-job-filter"
+              value={jobTypeFilter}
+              onChange={(e) => setJobTypeFilter(e.target.value as JobTypeFilter)}
+              className={selectClass}
+            >
+              {JOB_TYPE_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="overflow-x-auto rounded-lg border border-border-subtle bg-surface">
-          <table className="min-w-[960px] w-full text-left text-sm">
+          <table className="min-w-[1100px] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border-subtle text-muted">
-                <th className="px-4 py-3 font-normal">ID</th>
+                <th className="px-4 py-3 font-normal whitespace-nowrap">Date</th>
                 <th className="px-4 py-3 font-normal">Name</th>
+                <th className="px-4 py-3 font-normal whitespace-nowrap">Phone</th>
                 <th className="px-4 py-3 font-normal">Email</th>
-                <th className="px-4 py-3 font-normal">Phone</th>
-                <th className="px-4 py-3 font-normal min-w-[200px]">Address</th>
-                <th className="px-4 py-3 font-normal">Roof size</th>
-                <th className="px-4 py-3 font-normal min-w-[140px]">Price range</th>
-                <th className="px-4 py-3 font-normal min-w-[160px]">Submitted</th>
-                <th className="px-4 py-3 font-normal">Status</th>
+                <th className="px-4 py-3 font-normal min-w-[180px]">Address</th>
+                <th className="px-4 py-3 font-normal">Job type</th>
+                <th className="px-4 py-3 font-normal whitespace-nowrap">Status</th>
+                <th className="px-4 py-3 font-normal min-w-[200px]">Notes</th>
               </tr>
             </thead>
             <tbody>
-              {leads.length === 0 ? (
+              {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-muted">
-                    No leads yet.
+                  <td colSpan={8} className="px-4 py-10 text-center text-muted">
+                    No leads match your filters.
                   </td>
                 </tr>
               ) : (
-                leads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-border-subtle last:border-b-0">
-                    <td className="px-4 py-3 text-foreground">{lead.id}</td>
-                    <td className="px-4 py-3 text-foreground">{lead.name?.trim() || "—"}</td>
-                    <td className="px-4 py-3 text-foreground break-all">{lead.email?.trim() || "—"}</td>
-                    <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                      {lead.phone?.trim() || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{lead.address}</td>
-                    <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                      {formatRoofAreaLabel(lead.roof_sqft, lead.country_code, lead.address)}
-                    </td>
-                    <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                      {formatPriceRange(lead, settings)}
-                    </td>
-                    <td className="px-4 py-3 text-muted whitespace-nowrap">
-                      {formatSubmittedAt(lead.created_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-block rounded-full border border-border-subtle bg-background px-2.5 py-0.5 text-xs text-foreground capitalize">
-                        {lead.status || "—"}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                filteredLeads.map((lead) => {
+                  const urgent = isEmergencyJobType(lead.job_type);
+                  const expanded = expandedId === lead.id;
+                  const notesValue = notesDraft[lead.id] ?? lead.notes ?? "";
+                  const notesDirty = notesValue !== (lead.notes ?? "");
+
+                  return (
+                    <Fragment key={lead.id}>
+                      <tr
+                        onClick={() => setExpandedId(expanded ? null : lead.id)}
+                        className={`border-b border-border-subtle cursor-pointer transition-colors hover:bg-background/60 ${
+                          urgent
+                            ? "bg-amber-950/35 border-l-4 border-l-amber-500"
+                            : expanded
+                              ? "bg-background/40"
+                              : ""
+                        }`}
+                      >
+                        <td className="px-4 py-3 text-muted whitespace-nowrap">
+                          {formatSubmittedAt(lead.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground">
+                          <div className="flex flex-col gap-1">
+                            <span>{displayValue(lead.name)}</span>
+                            {urgent ? (
+                              <span className="inline-flex w-fit items-center gap-1 rounded-md bg-amber-500/20 border border-amber-500/50 px-2 py-0.5 text-xs font-medium text-amber-300">
+                                ⚠️ URGENT
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                          {displayValue(lead.phone)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground break-all max-w-[200px]">
+                          {displayValue(lead.email)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground">{lead.address}</td>
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                          <span title={lead.job_type ?? undefined}>
+                            {jobTypeEmoji(lead.job_type)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={normalizeAdminLeadStatus(lead.status)}
+                            disabled={savingStatusId === lead.id}
+                            onChange={(e) =>
+                              void handleStatusChange(lead.id, e.target.value as AdminLeadStatus)
+                            }
+                            className={`${selectClass} min-w-[120px] disabled:opacity-50`}
+                            aria-label={`Status for ${displayValue(lead.name)}`}
+                          >
+                            {ADMIN_LEAD_STATUS_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col gap-2 min-w-[180px]">
+                            <textarea
+                              rows={2}
+                              value={notesValue}
+                              onChange={(e) =>
+                                setNotesDraft((d) => ({ ...d, [lead.id]: e.target.value }))
+                              }
+                              onBlur={() => void saveNotes(lead.id)}
+                              className={`${inputClass} resize-y min-h-[52px]`}
+                              placeholder="Add notes…"
+                              aria-label={`Notes for ${displayValue(lead.name)}`}
+                            />
+                            {notesDirty ? (
+                              <button
+                                type="button"
+                                onClick={() => void saveNotes(lead.id)}
+                                disabled={savingNotesId === lead.id}
+                                className="self-start rounded-lg border border-accent bg-accent/10 px-3 py-1 text-xs text-accent hover:bg-accent/20 disabled:opacity-50"
+                              >
+                                {savingNotesId === lead.id ? "Saving…" : "Save notes"}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded ? (
+                        <tr key={`${lead.id}-detail`} className="border-b border-border-subtle bg-background/50">
+                          <td colSpan={8} className="px-4 py-4">
+                            <LeadDetailPanel lead={lead} />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+        <p className="text-xs text-muted">Click a row to expand full lead details.</p>
       </div>
     </main>
+  );
+}
+
+function LeadDetailPanel({ lead }: { lead: AdminLead }) {
+  const urgent = isEmergencyJobType(lead.job_type);
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Lead ID", value: String(lead.id) },
+    { label: "Submitted", value: formatSubmittedAtDetail(lead.created_at) },
+    { label: "Name", value: displayValue(lead.name) },
+    { label: "Phone", value: displayValue(lead.phone) },
+    { label: "Email", value: displayValue(lead.email) },
+    { label: "Address", value: lead.address },
+    { label: "Job type", value: displayValue(lead.job_type) },
+    { label: "Status", value: normalizeAdminLeadStatus(lead.status) },
+    { label: "Notes", value: displayValue(lead.notes) },
+    { label: "Country", value: displayValue(lead.country_code) },
+    {
+      label: "Roof size (sq ft)",
+      value: lead.roof_sqft != null ? String(lead.roof_sqft) : "—",
+    },
+    {
+      label: "Quote range",
+      value:
+        lead.quote_standard_low != null || lead.quote_standard_high != null
+          ? `${lead.quote_standard_low ?? "—"} – ${lead.quote_standard_high ?? "—"}`
+          : "—",
+    },
+    {
+      label: "Inspection",
+      value: lead.inspection_datetime
+        ? formatSubmittedAtDetail(lead.inspection_datetime)
+        : "—",
+    },
+    { label: "Deposit paid", value: lead.deposit_paid ? "Yes" : "No" },
+    { label: "Best time to contact", value: displayValue(lead.best_time_to_contact) },
+    {
+      label: "UTM",
+      value: [lead.utm_source, lead.utm_medium, lead.utm_campaign].filter(Boolean).join(" / ") || "—",
+    },
+    {
+      label: "Coordinates",
+      value:
+        lead.latitude != null && lead.longitude != null
+          ? `${lead.latitude}, ${lead.longitude}`
+          : "—",
+    },
+  ];
+
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        urgent ? "border-amber-500/50 bg-amber-950/25" : "border-border-subtle bg-surface"
+      }`}
+    >
+      {urgent ? (
+        <p className="mb-3 text-sm font-medium text-amber-300">
+          ⚠️ URGENT — customer reported an active leak or damage
+        </p>
+      ) : null}
+      <h3 className="text-sm text-foreground mb-3">Lead details</h3>
+      <dl className="grid gap-2 sm:grid-cols-2 text-sm">
+        {rows.map((row) => (
+          <div key={row.label} className="grid grid-cols-[minmax(0,140px)_1fr] gap-2">
+            <dt className="text-muted">{row.label}</dt>
+            <dd className="text-foreground break-words">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }

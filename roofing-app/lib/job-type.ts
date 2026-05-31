@@ -16,6 +16,11 @@ export function isValidJobType(value: unknown): value is JobType {
   return typeof value === "string" && (JOB_TYPE_VALUES as readonly string[]).includes(value);
 }
 
+export function jobTypeEmoji(value: string | null | undefined): string {
+  const match = JOB_TYPE_OPTIONS.find((o) => o.value === value);
+  return match?.emoji ?? "—";
+}
+
 export function jobTypeLabel(value: string | null | undefined): string {
   const match = JOB_TYPE_OPTIONS.find((o) => o.value === value);
   return match ? `${match.emoji} ${match.label}` : "—";
