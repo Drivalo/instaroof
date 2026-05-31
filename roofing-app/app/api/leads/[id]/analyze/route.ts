@@ -15,7 +15,6 @@ import {
   visionAnalysisFromCoordinateFallback,
 } from "@/lib/regional-roof-estimate";
 import { runVisionAnalysis } from "@/lib/integrations";
-import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { VISION_TIMEOUT_MESSAGE } from "@/lib/vision-constants";
 import {
   VisionAnalysisRefusalError,
@@ -177,10 +176,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ...updated,
       satellite_image_url: satelliteImageSrcForLead(updated),
     };
-
-    void sendLeadNotificationEmail(updated.id, req.nextUrl.origin, "analysis_complete").catch((err) =>
-      console.error("[vision/analyze] company notification failed:", err),
-    );
 
     return NextResponse.json({ lead: leadWithImage, cached: false, analysis_source: analysisSource });
   } catch (error) {

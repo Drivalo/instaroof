@@ -51,23 +51,49 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    void sendLeadNotificationEmail(leadId, req.nextUrl.origin, "contact_updated").catch((err) =>
-      console.error("[leads/PATCH] company notification failed:", err),
-    );
+    const leadRecord = mapRowToLeadRecord(data as Record<string, unknown>);
+    const savedEmail = leadRecord.email?.trim() ?? "";
 
-    const savedEmail = typeof data.email === "string" ? data.email.trim() : "";
+    const boEmailResult = await sendLeadNotificationEmail(
+      leadId,
+      req.nextUrl.origin,
+      "contact_updated",
+    );
+    console.info("[leads/PATCH] company notification result", {
+      leadId,
+      sent: boEmailResult.sent,
+      skipped: boEmailResult.skipped ?? false,
+      reason: boEmailResult.reason ?? null,
+    });
+
+    let customerEmailResult: Awaited<ReturnType<typeof sendCustomerQuoteReadyEmail>> | null = null;
     if (savedEmail) {
-      const leadRecord = mapRowToLeadRecord(data as Record<string, unknown>);
-      void sendCustomerQuoteReadyEmail(leadId, req.nextUrl.origin, leadRecord).catch((err) =>
-        console.error("[leads/PATCH] customer quote email failed:", err),
+      customerEmailResult = await sendCustomerQuoteReadyEmail(
+        leadId,
+        req.nextUrl.origin,
+        leadRecord,
       );
+      console.info("[leads/PATCH] customer quote email result", {
+        leadId,
+        to: savedEmail,
+        sent: customerEmailResult.sent,
+        skipped: customerEmailResult.skipped ?? false,
+        reason: customerEmailResult.reason ?? null,
+        messageId: customerEmailResult.messageId ?? null,
+      });
     } else {
       console.warn("[leads/PATCH] customer quote email skipped — lead has no email after update", {
         leadId,
       });
     }
 
-    return NextResponse.json({ lead: data });
+    return NextResponse.json({
+      lead: data,
+      emails: {
+        companyNotification: boEmailResult,
+        customerQuote: customerEmailResult,
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update lead" },
