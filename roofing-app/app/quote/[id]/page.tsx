@@ -24,6 +24,12 @@ function isValidPhone(value: string) {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+function isValidPhoneOptional(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  return isValidPhone(trimmed);
+}
+
 type QuoteCurrency = "GB" | "AU" | "NZ" | "US";
 
 /** UK: "UK", "uk", "United Kingdom", or country code GB (case-insensitive). */
@@ -172,13 +178,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     const email = String(lead.email ?? "");
     const phone = String(lead.phone ?? "");
     setContact({ name, email, phone });
-    if (name.trim() && isValidEmail(email) && isValidPhone(phone)) {
+    if (name.trim() && isValidEmail(email) && isValidPhoneOptional(phone)) {
       setDetailsUnlocked(true);
     }
   }, [lead]);
 
   const contactReady =
-    contact.name.trim().length > 0 && isValidEmail(contact.email) && isValidPhone(contact.phone);
+    contact.name.trim().length > 0 &&
+    isValidEmail(contact.email) &&
+    isValidPhoneOptional(contact.phone);
 
   async function saveContactDetails(): Promise<boolean> {
     const name = contact.name.trim();
@@ -186,14 +194,14 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     const phone = contact.phone.trim();
 
     if (!name) {
-      alert("Please enter your name.");
+      alert("Please enter your first name.");
       return false;
     }
     if (!isValidEmail(email)) {
       alert("Please enter a valid email address.");
       return false;
     }
-    if (!isValidPhone(phone)) {
+    if (!isValidPhoneOptional(phone)) {
       alert("Please enter a valid phone number.");
       return false;
     }
@@ -357,15 +365,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             <div className="mt-6 space-y-4">
               <div>
                 <label htmlFor="modal-quote-name" className="block text-sm text-muted mb-1.5">
-                  Name
+                  First name
                 </label>
                 <input
                   id="modal-quote-name"
                   type="text"
                   required
-                  autoComplete="name"
+                  autoComplete="given-name"
                   className={contactFieldClass}
-                  placeholder="Your full name"
+                  placeholder="First name"
                   value={contact.name}
                   onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
                 />
@@ -387,12 +395,11 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               </div>
               <div>
                 <label htmlFor="modal-quote-phone" className="block text-sm text-muted mb-1.5">
-                  Phone number
+                  Phone (optional)
                 </label>
                 <input
                   id="modal-quote-phone"
                   type="tel"
-                  required
                   autoComplete="tel"
                   className={contactFieldClass}
                   placeholder="Phone number"
