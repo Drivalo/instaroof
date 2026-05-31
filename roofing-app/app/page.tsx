@@ -4,11 +4,10 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AddressFieldWithCountry, {
-  PostcodeAddressFieldHandle,
+  AddressFieldHandle,
   AddressPlaceDetails,
 } from "@/components/address-field-with-country";
 import { hasGoogleMapsKey } from "@/lib/google-maps-script";
-import { isPostcodeInputValid } from "@/lib/postcode-input";
 
 type BootstrapData = {
   settings: {
@@ -27,15 +26,14 @@ export default function Home() {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [placeDetails, setPlaceDetails] = useState<AddressPlaceDetails | null>(null);
-  const [addressFlowStep, setAddressFlowStep] = useState<1 | 2>(1);
-  const [postcodeInput, setPostcodeInput] = useState("");
+  const [placeConfirmed, setPlaceConfirmed] = useState(false);
   const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const [previewMaterial, setPreviewMaterial] = useState<string | null>(null);
-  const addressInputRef = useRef<PostcodeAddressFieldHandle>(null);
+  const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -66,23 +64,21 @@ export default function Home() {
   }
 
   const hasValidAddress =
+    placeConfirmed &&
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const canSubmitPostcode = isPostcodeInputValid(postcodeInput);
-  const primaryCtaEnabled =
-    addressFlowStep === 1 ? canSubmitPostcode && !loadingPreview : hasValidAddress && !loadingPreview;
+  const primaryCtaEnabled = hasValidAddress && !loadingPreview;
 
   async function handlePrimaryCta() {
-    if (addressFlowStep === 1) {
-      await addressInputRef.current?.advanceToAddressStep();
-      return;
-    }
+    if (!addressInputRef.current?.validateForSubmit()) return;
     await createLead();
   }
 
   async function createLead() {
-    const details = addressInputRef.current?.getPlaceDetails() ?? placeDetails;
+    if (!addressInputRef.current?.validateForSubmit()) return;
+
+    const details = addressInputRef.current.getPlaceDetails() ?? placeDetails;
     if (!details || !hasValidCoords(details.latitude, details.longitude)) {
       return;
     }
@@ -116,7 +112,14 @@ export default function Home() {
       setPreviewMaterial(data.material ?? null);
     } catch (err) {
       console.error("[createLead] preview estimate failed:", err);
-      alert(err instanceof Error ? err.message : "Could not estimate roof size. Please try again.");
+      const message = err instanceof Error ? err.message : "Could not estimate roof size. Please try again.";
+      const isAddressSelectionError =
+        message.toLowerCase().includes("dropdown") || message.toLowerCase().includes("select an address");
+      if (isAddressSelectionError) {
+        addressInputRef.current?.validateForSubmit();
+      } else {
+        alert(message);
+      }
       setMockQuoteVisible(false);
     } finally {
       setLoadingPreview(false);
@@ -124,7 +127,9 @@ export default function Home() {
   }
 
   async function createRealLead() {
-    const details = addressInputRef.current?.getPlaceDetails() ?? placeDetails;
+    if (!addressInputRef.current?.validateForSubmit()) return;
+
+    const details = addressInputRef.current.getPlaceDetails() ?? placeDetails;
     if (!details || !hasValidCoords(details.latitude, details.longitude)) {
       return;
     }
@@ -239,9 +244,8 @@ export default function Home() {
               <AddressFieldWithCountry
                 ref={addressInputRef}
                 className="w-full"
-                onStepChange={setAddressFlowStep}
-                onPostcodeChange={setPostcodeInput}
                 onPlaceSelected={setPlaceDetails}
+                onPlaceConfirmedChange={setPlaceConfirmed}
               />
               <button
                 type="button"
@@ -249,11 +253,7 @@ export default function Home() {
                 disabled={!primaryCtaEnabled}
                 className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingPreview
-                  ? "Estimating…"
-                  : addressFlowStep === 1
-                    ? "Continue"
-                    : "Get My Instant Quote"}
+                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
             </div>
 
@@ -326,7 +326,7 @@ export default function Home() {
           <h2 className="text-2xl md:text-3xl">How it works</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {[
-              { step: "01", text: "Enter your postcode and address" },
+              { step: "01", text: "Enter your address" },
               { step: "02", text: "We analyse your roof from satellite imagery" },
               { step: "03", text: "Receive your quote instantly" },
             ].map((item) => (
