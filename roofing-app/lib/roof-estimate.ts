@@ -38,14 +38,15 @@ export function estimateRoofSqftFromCoordinates(lat: number, lng: number): numbe
 
 export function usesMetricRoofDisplay(address?: string | null, countryCode?: string | null): boolean {
   const code = String(countryCode ?? "").trim().toUpperCase();
-  if (code === "GB" || code === "UK" || code === "AU" || code === "NZ") return true;
+  if (code === "GB" || code === "UK" || code === "AU" || code === "NZ" || code === "CA") return true;
   const addr = String(address ?? "").toLowerCase();
   return (
     addr.includes(", uk") ||
     addr.endsWith(" uk") ||
     addr.includes("united kingdom") ||
     addr.includes("australia") ||
-    addr.includes("new zealand")
+    addr.includes("new zealand") ||
+    addr.includes("canada")
   );
 }
 
@@ -75,6 +76,9 @@ export function previewMaterialForRegion(address?: string | null, countryCode?: 
   if (code === "AU" || code === "NZ" || addr.includes("australia") || addr.includes("new zealand")) {
     return "Colorbond steel";
   }
+  if (code === "CA" || addr.includes("canada")) {
+    return "Asphalt shingle";
+  }
   return "Asphalt shingle";
 }
 
@@ -101,6 +105,12 @@ export function previewPriceRangeFromEstimate(
   if (address.includes("New Zealand") || countryCode === "NZ") {
     const rate = Number(merged.currency_rate_nzd ?? 1.64);
     return `NZ$${fmt(lowUsd * rate)}-NZ$${fmt(highUsd * rate)}`;
+  }
+  if (address.includes("Canada") || countryCode === "CA") {
+    const rate = Number(
+      (merged as { currency_rate_cad?: number }).currency_rate_cad ?? 1.36,
+    );
+    return `C$${fmt(lowUsd * rate)}-C$${fmt(highUsd * rate)}`;
   }
   return `$${fmt(lowUsd)}-$${fmt(highUsd)}`;
 }

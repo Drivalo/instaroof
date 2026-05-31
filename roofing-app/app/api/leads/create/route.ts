@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isInServiceArea } from "@/lib/service-area";
 import { ensureEnvLoaded } from "@/lib/env.server";
+import { normalizeLeadCountryCode } from "@/lib/normalize-country-code";
 import { getGoogleMapsApiKey, satelliteProxyPath } from "@/lib/maps-static";
 import { getSettings, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import {
@@ -34,17 +35,6 @@ async function insertLeadWithRetry(payload: LeadInsertPayload) {
 
     lastError = error;
     logSupabaseError("leads/create", error, attempt);
-
-    if (
-      isPostgrestError(error) &&
-      error.message.includes("country_code") &&
-      "country_code" in attemptPayload
-    ) {
-      console.warn("[leads/create] Retrying without country_code — run supabase/migrations/add_country_code.sql");
-      const { country_code, ...withoutCountry } = attemptPayload;
-      void country_code;
-      attemptPayload = withoutCountry;
-    }
 
     if (attempt < MAX_ATTEMPTS) {
       console.info(`[leads/create] Retrying insert in ${RETRY_DELAY_MS}ms...`);
@@ -133,6 +123,11 @@ export async function POST(req: NextRequest) {
     }
 
     const inServiceArea = isInServiceArea(settings.service_area_zip_codes, zip_code);
+    const normalizedCountryCode = normalizeLeadCountryCode(country_code, {
+      address,
+      latitude,
+      longitude,
+    });
 
     if (!inServiceArea) {
       const { data, error } = await insertLeadWithRetry({
@@ -140,7 +135,7 @@ export async function POST(req: NextRequest) {
         latitude,
         longitude,
         zip_code,
-        country_code: country_code || null,
+        country_code: normalizedCountryCode,
         email,
         phone: phone || null,
         utm_source,
@@ -172,7 +167,7 @@ export async function POST(req: NextRequest) {
       latitude,
       longitude,
       zip_code,
-      country_code: country_code || null,
+      country_code: normalizedCountryCode,
       satellite_image_url: satelliteImageUrl,
       utm_source,
       utm_medium,

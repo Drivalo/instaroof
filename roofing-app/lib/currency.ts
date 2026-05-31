@@ -1,17 +1,19 @@
 import { SettingsRow } from "@/lib/types";
 
-export type CurrencyRegion = "US" | "GB" | "AU" | "NZ";
+export type CurrencyRegion = "US" | "GB" | "AU" | "NZ" | "CA";
 
 export type CurrencyRates = {
   gbp: number;
   aud: number;
   nzd: number;
+  cad: number;
 };
 
 export const DEFAULT_CURRENCY_RATES: CurrencyRates = {
   gbp: 0.79,
   aud: 1.53,
   nzd: 1.64,
+  cad: 1.36,
 };
 
 const REGION_META: Record<
@@ -38,6 +40,11 @@ const REGION_META: Record<
     label: "New Zealand Dollars",
     formatRange: (low, high) => `NZD $${fmt(low)} - NZD $${fmt(high)}`,
   },
+  CA: {
+    code: "CAD",
+    label: "Canadian Dollars",
+    formatRange: (low, high) => `C$${fmt(low)} - C$${fmt(high)} CAD`,
+  },
 };
 
 function fmt(amount: number) {
@@ -51,6 +58,7 @@ function regionFromCountryCode(countryCode?: string | null): CurrencyRegion | nu
   if (code === "AU") return "AU";
   if (code === "NZ") return "NZ";
   if (code === "US") return "US";
+  if (code === "CA") return "CA";
   return null;
 }
 
@@ -60,6 +68,7 @@ function regionFromCoordinates(lat?: number | null, lng?: number | null): Curren
   if (lat >= -47 && lat <= -34 && lng >= 166 && lng <= 179) return "NZ";
   if (lat >= -44 && lat <= -10 && lng >= 113 && lng <= 154) return "AU";
   if (lat >= 49 && lat <= 61 && lng >= -8.5 && lng <= 2.5) return "GB";
+  if (lat >= 41.7 && lat <= 83.5 && lng >= -141 && lng <= -52) return "CA";
   if (lat >= 24 && lat <= 50 && lng >= -125 && lng <= -66) return "US";
   return null;
 }
@@ -103,6 +112,14 @@ export function detectCurrencyRegion(
       return "NZ";
     }
 
+    if (
+      /,\s*(canada)\s*$/i.test(raw) ||
+      /\b(canada|ontario|quebec|british columbia|alberta|manitoba|saskatchewan)\b/i.test(normalized) ||
+      /\b(toronto|vancouver|montreal|calgary|ottawa|edmonton)\b/i.test(normalized)
+    ) {
+      return "CA";
+    }
+
     if (/\b(usa|u\.s\.a\.|united states|u\.s\.)\b/i.test(normalized) || /,\s*(usa|united states)\s*$/i.test(raw)) {
       return "US";
     }
@@ -140,6 +157,10 @@ export function getCurrencyRates(settings?: Partial<SettingsRow> | null): Curren
     gbp: Number(settings?.currency_rate_gbp ?? DEFAULT_CURRENCY_RATES.gbp),
     aud: Number(settings?.currency_rate_aud ?? DEFAULT_CURRENCY_RATES.aud),
     nzd: Number(settings?.currency_rate_nzd ?? DEFAULT_CURRENCY_RATES.nzd),
+    cad: Number(
+      (settings as { currency_rate_cad?: number } | null | undefined)?.currency_rate_cad ??
+        DEFAULT_CURRENCY_RATES.cad,
+    ),
   };
 }
 
@@ -162,6 +183,8 @@ function usdToLocal(usd: number, region: CurrencyRegion, rates: CurrencyRates): 
       return usd * rates.aud;
     case "NZ":
       return usd * rates.nzd;
+    case "CA":
+      return usd * rates.cad;
     default:
       return usd;
   }
@@ -216,6 +239,8 @@ export function formatDeposit(
       return `AUD $${fmt(local)}`;
     case "NZ":
       return `NZD $${fmt(local)}`;
+    case "CA":
+      return `C$${fmt(local)} CAD`;
     default:
       return `$${fmt(local)} USD`;
   }

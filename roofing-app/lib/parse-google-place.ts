@@ -65,8 +65,9 @@ export function parseGooglePlace(place: GooglePlaceResult | null | undefined): P
     place.address_components?.find((c) => c.types.includes("postal_code"))?.long_name ||
     "";
 
-  const countryCode =
+  const rawCountry =
     place.address_components?.find((c) => c.types.includes("country"))?.short_name || "";
+  const countryCode = rawCountry.trim().toUpperCase() === "UK" ? "GB" : rawCountry.trim().toUpperCase();
 
   const bounds =
     boundsFromViewport(place.geometry?.viewport) ?? boundsAroundPoint(latitude, longitude, 0.06);

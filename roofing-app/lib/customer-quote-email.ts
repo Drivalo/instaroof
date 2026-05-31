@@ -1,5 +1,6 @@
 import { Resend } from "resend";
-import { detectCurrencyRegion, getCurrencyDisplay, formatDeposit } from "@/lib/currency";
+import { getCurrencyDisplay, formatDeposit } from "@/lib/currency";
+import { normalizeLeadCountryCode } from "@/lib/normalize-country-code";
 import { formatInspectionSchedule } from "@/lib/inspection-datetime";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import {
@@ -36,18 +37,8 @@ const SUBJECT_QUOTE = "Your roof quote is ready";
 const SUBJECT_BOOKED = "Your inspection is confirmed";
 const QUOTE_READY_FROM_EMAIL = "hello@nimly.tech";
 
-/** Columns that exist on all deployed leads tables (excludes optional country_code). */
 const LEAD_EMAIL_SELECT =
-  "id, name, email, address, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid";
-
-function deriveCountryCodeFromAddress(
-  address: string,
-  latitude?: number | null,
-  longitude?: number | null,
-): string | null {
-  const region = detectCurrencyRegion(address, null, latitude, longitude);
-  return region ?? null;
-}
+  "id, name, email, address, country_code, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid";
 
 function resolveRoofSqft(lead: LeadRecord): number | null {
   if (lead.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft))) {
@@ -327,7 +318,7 @@ function resolveSubject(lead: LeadRecord): string {
   return hasInspectionBooking(lead) ? SUBJECT_BOOKED : SUBJECT_QUOTE;
 }
 
-/** Map Supabase row to email lead; country derived from address/coordinates when not in DB. */
+/** Map Supabase row to email lead; country_code comes from the database. */
 export function mapRowToLeadRecord(row: Record<string, unknown>): LeadRecord {
   const address = String(row.address ?? "");
   const latitude = (row.latitude as number | null) ?? null;
@@ -338,7 +329,7 @@ export function mapRowToLeadRecord(row: Record<string, unknown>): LeadRecord {
     name: (row.name as string | null) ?? null,
     email: (row.email as string | null) ?? null,
     address,
-    country_code: deriveCountryCodeFromAddress(address, latitude, longitude),
+    country_code: normalizeLeadCountryCode(row.country_code, { address, latitude, longitude }),
     latitude,
     longitude,
     roof_sqft: (row.roof_sqft as number | null) ?? null,

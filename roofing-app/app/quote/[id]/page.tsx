@@ -24,7 +24,7 @@ function isValidPhone(value: string) {
   return digits.length >= 7 && digits.length <= 15;
 }
 
-type QuoteCurrency = "GB" | "AU" | "NZ" | "US";
+type QuoteCurrency = "GB" | "AU" | "NZ" | "US" | "CA";
 
 /** UK: "UK", "uk", "United Kingdom", or country code GB (case-insensitive). */
 function isUkRegion(address: string, countryCode?: string | null): boolean {
@@ -57,6 +57,10 @@ function detectQuoteCurrency(address: string, countryCode?: string | null): Quot
     return "NZ";
   }
 
+  if (addr.includes("canada") || code === "ca") {
+    return "CA";
+  }
+
   return "US";
 }
 
@@ -75,6 +79,9 @@ function formatQuotePriceRange(
   const rateGbp = Number(settings?.currency_rate_gbp ?? 0.79);
   const rateAud = Number(settings?.currency_rate_aud ?? 1.53);
   const rateNzd = Number(settings?.currency_rate_nzd ?? 1.64);
+  const rateCad = Number(
+    (settings as { currency_rate_cad?: number } | null)?.currency_rate_cad ?? 1.36,
+  );
 
   const fmt = (amount: number) => Math.round(amount).toLocaleString("en-US");
 
@@ -94,6 +101,11 @@ function formatQuotePriceRange(
       const highLocal = high * rateNzd;
       return `NZ$${fmt(lowLocal)} - NZ$${fmt(highLocal)}`;
     }
+    case "CA": {
+      const lowLocal = low * rateCad;
+      const highLocal = high * rateCad;
+      return `C$${fmt(lowLocal)} - C$${fmt(highLocal)}`;
+    }
     default:
       return `$${fmt(low)} - $${fmt(high)}`;
   }
@@ -109,6 +121,9 @@ function formatDepositPrice(
   const rateGbp = Number(settings?.currency_rate_gbp ?? 0.79);
   const rateAud = Number(settings?.currency_rate_aud ?? 1.53);
   const rateNzd = Number(settings?.currency_rate_nzd ?? 1.64);
+  const rateCad = Number(
+    (settings as { currency_rate_cad?: number } | null)?.currency_rate_cad ?? 1.36,
+  );
   const fmt = (amount: number) => Math.round(amount).toLocaleString("en-US");
 
   switch (currency) {
@@ -118,6 +133,8 @@ function formatDepositPrice(
       return `A$${fmt(usdDeposit * rateAud)}`;
     case "NZ":
       return `NZ$${fmt(usdDeposit * rateNzd)}`;
+    case "CA":
+      return `C$${fmt(usdDeposit * rateCad)}`;
     default:
       return `$${fmt(usdDeposit)}`;
   }
