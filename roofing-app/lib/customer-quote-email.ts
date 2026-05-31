@@ -34,6 +34,7 @@ type LeadRecord = {
 
 const SUBJECT_QUOTE = "Your roof quote is ready";
 const SUBJECT_BOOKED = "Your inspection is confirmed";
+const QUOTE_READY_FROM_EMAIL = "hello@nimly.tech";
 
 /** Columns that exist on all deployed leads tables (excludes optional country_code). */
 const LEAD_EMAIL_SELECT =
@@ -380,6 +381,8 @@ async function sendCustomerEmail(
     requireInspection: boolean;
     inspectionDatetimeFromConfirm?: string | null;
     preloadedLead?: LeadRecord | null;
+    /** Overrides RESEND_FROM_EMAIL when set (quote-ready email only). */
+    from?: string;
   },
 ): Promise<CustomerQuoteEmailResult> {
   console.info("[customer-quote-email] sendCustomerEmail called", {
@@ -458,7 +461,7 @@ async function sendCustomerEmail(
   const settings = await getSettings();
   const firstName = (record.name?.trim().split(/\s+/)[0] || "there").replace(/[<>]/g, "");
   const quoteUrl = `${appBaseUrl.replace(/\/$/, "")}/quote/${leadId}`;
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "hello@nimly.tech";
+  const from = options.from?.trim() || process.env.RESEND_FROM_EMAIL?.trim() || "hello@nimly.tech";
   const subject = options.requireInspection ? SUBJECT_BOOKED : resolveSubject(record);
 
   try {
@@ -526,11 +529,13 @@ export async function sendCustomerQuoteReadyEmail(
   console.info("[customer-quote-email] sendCustomerQuoteReadyEmail ENTRY", {
     leadId,
     email: preloadedLead?.email ?? null,
+    from: QUOTE_READY_FROM_EMAIL,
     hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
   });
   return sendCustomerEmail(leadId, appBaseUrl, {
     requireInspection: false,
     preloadedLead: preloadedLead ?? null,
+    from: QUOTE_READY_FROM_EMAIL,
   });
 }
 
