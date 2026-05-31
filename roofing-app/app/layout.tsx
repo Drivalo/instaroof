@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Jost } from "next/font/google";
 import "./globals.css";
+import { SiteFooter } from "@/components/site-footer";
 import TrackingScripts from "@/components/tracking-scripts";
 
 const dmSans = DM_Sans({
@@ -29,7 +30,8 @@ export default function RootLayout({
     <html lang="en" className={`${dmSans.variable} ${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <TrackingScripts />
-        {children}
+        <div className="flex min-h-full flex-1 flex-col">{children}</div>
+        <SiteFooter />
       </body>
     </html>
   );

@@ -363,9 +363,6 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="container-max py-8 text-sm text-muted border-t border-border-subtle">
-        Nimly © 2026
-      </footer>
     </main>
   );
 }

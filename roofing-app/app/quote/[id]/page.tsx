@@ -141,6 +141,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [availability, setAvailability] = useState<any[]>([]);
   const [inspectionSlot, setInspectionSlot] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -186,7 +187,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const contactReady =
     contact.name.trim().length > 0 &&
     isValidEmail(contact.email) &&
-    isValidPhoneOptional(contact.phone);
+    isValidPhoneOptional(contact.phone) &&
+    privacyConsent;
 
   async function saveContactDetails(): Promise<boolean> {
     const name = contact.name.trim();
@@ -203,6 +205,10 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
     if (!isValidPhoneOptional(phone)) {
       alert("Please enter a valid phone number.");
+      return false;
+    }
+    if (!privacyConsent) {
+      alert("Please agree to the privacy policy before continuing.");
       return false;
     }
 
@@ -408,6 +414,21 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 />
               </div>
             </div>
+            <label className="mt-4 flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={privacyConsent}
+                onChange={(e) => setPrivacyConsent(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 rounded border-border-subtle bg-background accent-[#F5A623]"
+              />
+              <span className="text-sm text-muted leading-relaxed">
+                I agree to my personal data being processed to generate and deliver my roof quote.{" "}
+                <Link href="/privacy" className="text-accent underline-offset-2 hover:underline">
+                  View our Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
             <button
               type="button"
               onClick={() => void handleSeeMyQuote()}
