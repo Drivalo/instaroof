@@ -52,7 +52,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .select("*")
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[leads/PATCH] Supabase update failed", {
+        leadId,
+        updateKeys: Object.keys(updates),
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        raw: error,
+      });
+      throw error;
+    }
     if (!data) {
       console.error("[leads/PATCH] no lead updated", { leadId, updates: Object.keys(updates) });
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
@@ -102,6 +113,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       },
     });
   } catch (error) {
+    const supabaseError =
+      error && typeof error === "object" && "code" in error
+        ? {
+            message: (error as { message?: string }).message,
+            details: (error as { details?: string }).details,
+            hint: (error as { hint?: string }).hint,
+            code: (error as { code?: string }).code,
+          }
+        : null;
+    console.error("[leads/PATCH] request failed", {
+      message: error instanceof Error ? error.message : String(error),
+      supabase: supabaseError,
+      stack: error instanceof Error ? error.stack : undefined,
+      raw: error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update lead" },
       { status: 500 },
