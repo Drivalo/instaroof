@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ensureEnvLoaded } from "@/lib/env.server";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { satelliteImageSrcForLead } from "@/lib/maps-static";
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  ensureEnvLoaded();
+
   try {
-    const { id } = await params;
+    const { id: idParam } = await params;
+    const leadId = Number(idParam);
+    if (!Number.isFinite(leadId) || leadId <= 0) {
+      return NextResponse.json({ error: "Invalid lead id" }, { status: 400 });
+    }
+
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in roofing-app/.env.local.",
+        },
+        { status: 500 },
+      );
+    }
+
     const body = await req.json();
     const { name, email, phone } = body;
 
@@ -19,10 +37,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from("leads").update(updates).eq("id", id).select("*").single();
-    if (error) throw error;
+    const { data, error } = await supabase
+      .from("leads")
+      .update(updates)
+      .eq("id", leadId)
+      .select("*")
+      .maybeSingle();
 
-    void sendLeadNotificationEmail(Number(id), req.nextUrl.origin, "contact_updated").catch((err) =>
+    if (error) throw error;
+    if (!data) {
+      console.error("[leads/PATCH] no lead updated", { leadId, updates: Object.keys(updates) });
+      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    }
+
+    void sendLeadNotificationEmail(leadId, req.nextUrl.origin, "contact_updated").catch((err) =>
       console.error("[leads/PATCH] company notification failed:", err),
     );
 

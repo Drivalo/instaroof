@@ -198,6 +198,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       return false;
     }
 
+    if (!id) {
+      console.error("[quote] saveContactDetails blocked — lead id not loaded yet");
+      alert("Quote is still loading. Please wait a moment and try again.");
+      return false;
+    }
+
     setSavingContact(true);
     try {
       const res = await fetch(`/api/leads/${id}`, {
@@ -207,11 +213,19 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       });
       const data = await res.json();
       if (!res.ok) {
+        console.error("[quote] saveContactDetails failed:", { status: res.status, error: data.error, leadId: id });
         throw new Error(data.error || "Could not save your details");
       }
-      if (data.lead) setLead(data.lead);
+      if (!data.lead) {
+        console.error("[quote] saveContactDetails — OK response but no lead returned", { leadId: id });
+        throw new Error("Could not save your details");
+      }
+      setLead(data.lead);
       setDetailsUnlocked(true);
-      console.info("[quote] saveContactDetails success — detailsUnlocked set to true");
+      console.info("[quote] saveContactDetails success — lead updated in Supabase", {
+        leadId: id,
+        email: data.lead.email ?? null,
+      });
       return true;
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not save your details. Please try again.");
