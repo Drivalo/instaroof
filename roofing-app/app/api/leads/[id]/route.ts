@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env.server";
+import { mapRowToLeadRecord, sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { satelliteImageSrcForLead } from "@/lib/maps-static";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
@@ -53,6 +54,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     void sendLeadNotificationEmail(leadId, req.nextUrl.origin, "contact_updated").catch((err) =>
       console.error("[leads/PATCH] company notification failed:", err),
     );
+
+    const savedEmail = typeof data.email === "string" ? data.email.trim() : "";
+    if (savedEmail) {
+      const leadRecord = mapRowToLeadRecord(data as Record<string, unknown>);
+      void sendCustomerQuoteReadyEmail(leadId, req.nextUrl.origin, leadRecord).catch((err) =>
+        console.error("[leads/PATCH] customer quote email failed:", err),
+      );
+    } else {
+      console.warn("[leads/PATCH] customer quote email skipped — lead has no email after update", {
+        leadId,
+      });
+    }
 
     return NextResponse.json({ lead: data });
   } catch (error) {

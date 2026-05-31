@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { getCurrencyDisplay, formatDeposit } from "@/lib/currency";
+import { detectCurrencyRegion, getCurrencyDisplay, formatDeposit } from "@/lib/currency";
 import { formatInspectionSchedule } from "@/lib/inspection-datetime";
 import { ensureEnvLoaded } from "@/lib/env.server";
 import {
@@ -34,6 +34,19 @@ type LeadRecord = {
 
 const SUBJECT_QUOTE = "Your roof quote is ready";
 const SUBJECT_BOOKED = "Your inspection is confirmed";
+
+/** Columns that exist on all deployed leads tables (excludes optional country_code). */
+const LEAD_EMAIL_SELECT =
+  "id, name, email, address, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid";
+
+function deriveCountryCodeFromAddress(
+  address: string,
+  latitude?: number | null,
+  longitude?: number | null,
+): string | null {
+  const region = detectCurrencyRegion(address, null, latitude, longitude);
+  return region ?? null;
+}
 
 function resolveRoofSqft(lead: LeadRecord): number | null {
   if (lead.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft))) {
@@ -313,16 +326,20 @@ function resolveSubject(lead: LeadRecord): string {
   return hasInspectionBooking(lead) ? SUBJECT_BOOKED : SUBJECT_QUOTE;
 }
 
-/** Map Supabase row to email lead — country_code optional (column may not exist in DB). */
+/** Map Supabase row to email lead; country derived from address/coordinates when not in DB. */
 export function mapRowToLeadRecord(row: Record<string, unknown>): LeadRecord {
+  const address = String(row.address ?? "");
+  const latitude = (row.latitude as number | null) ?? null;
+  const longitude = (row.longitude as number | null) ?? null;
+
   return {
     id: Number(row.id),
     name: (row.name as string | null) ?? null,
     email: (row.email as string | null) ?? null,
-    address: String(row.address ?? ""),
-    country_code: (row.country_code as string | null | undefined) ?? null,
-    latitude: (row.latitude as number | null) ?? null,
-    longitude: (row.longitude as number | null) ?? null,
+    address,
+    country_code: deriveCountryCodeFromAddress(address, latitude, longitude),
+    latitude,
+    longitude,
     roof_sqft: (row.roof_sqft as number | null) ?? null,
     quote_standard_low: (row.quote_standard_low as number | null) ?? null,
     quote_standard_high: (row.quote_standard_high as number | null) ?? null,
@@ -333,7 +350,11 @@ export function mapRowToLeadRecord(row: Record<string, unknown>): LeadRecord {
 
 async function fetchLeadForEmail(leadId: number): Promise<LeadRecord | null> {
   const supabase = getSupabaseAdmin();
-  const { data: lead, error } = await supabase.from("leads").select("*").eq("id", leadId).single();
+  const { data: lead, error } = await supabase
+    .from("leads")
+    .select(LEAD_EMAIL_SELECT)
+    .eq("id", leadId)
+    .single();
 
   if (error || !lead) {
     console.error("[customer-quote-email] lead fetch failed", { leadId, error: error?.message });
@@ -494,6 +515,24 @@ export type BookingConfirmedEmailOptions = {
   /** Lead already loaded in confirm route — avoids a second failing query */
   preloadedLead?: LeadRecord | null;
 };
+
+/** After contact details are saved on the quote page — sends "Your roof quote is ready" to the customer. */
+export async function sendCustomerQuoteReadyEmail(
+  leadId: number,
+  appBaseUrl: string,
+  preloadedLead?: LeadRecord | null,
+): Promise<CustomerQuoteEmailResult> {
+  ensureEnvLoaded();
+  console.info("[customer-quote-email] sendCustomerQuoteReadyEmail ENTRY", {
+    leadId,
+    email: preloadedLead?.email ?? null,
+    hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
+  });
+  return sendCustomerEmail(leadId, appBaseUrl, {
+    requireInspection: false,
+    preloadedLead: preloadedLead ?? null,
+  });
+}
 
 /** After Stripe payment — requires inspection_datetime from DB before sending. */
 export async function sendCustomerBookingConfirmedEmail(
