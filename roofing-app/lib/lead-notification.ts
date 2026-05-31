@@ -1,5 +1,4 @@
 import { Resend } from "resend";
-import { getClientNotificationEmail } from "@/lib/client-config";
 import { getCurrencyDisplay } from "@/lib/currency";
 import { formatInspectionSchedule } from "@/lib/inspection-datetime";
 import { ensureEnvLoaded } from "@/lib/env.server";
@@ -202,8 +201,8 @@ export async function sendLeadNotificationEmail(
     return { sent: false, skipped: true, reason: "RESEND_API_KEY not configured" };
   }
 
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "hello@nimly.tech";
-  const to = getClientNotificationEmail();
+  const from = "hello@nimly.tech";
+  const to = "cherineywong@gmail.com";
   console.info("[lead-notification] Resend config", { from, to, hasApiKey: true });
 
   const supabase = getSupabaseAdmin();
