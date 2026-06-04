@@ -433,12 +433,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     <main className="customer-page container-max py-8 relative">
       {showDetailsModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 pointer-events-none overflow-y-auto overscroll-contain"
           role="dialog"
           aria-modal="true"
           aria-labelledby="quote-details-modal-title"
         >
-          <div className="w-full max-w-md rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl pointer-events-auto">
+          <div className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl my-4 sm:my-0 pointer-events-auto">
             <h2 id="quote-details-modal-title" className="text-xl md:text-2xl text-foreground">
               Your estimate is ready
             </h2>
