@@ -49,6 +49,14 @@ function displayValue(value: string | null | undefined): string {
   return trimmed || "—";
 }
 
+function hasLeadContactForNotification(lead: {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): boolean {
+  return Boolean(lead.name?.trim() && lead.email?.trim() && lead.phone?.trim());
+}
+
 function resolveRoofSqft(lead: LeadRecord): number | null {
   if (lead.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft))) {
     return Number(lead.roof_sqft);
@@ -238,6 +246,17 @@ export async function sendLeadNotificationEmail(
   if (error || !lead) {
     console.error("[lead-notification] lead fetch failed", { leadId, error: error?.message });
     return { sent: false, skipped: true, reason: "Lead not found" };
+  }
+
+  if (!hasLeadContactForNotification(lead)) {
+    console.info("[lead-notification] skipped — lead missing name, email, or phone", {
+      leadId,
+      context,
+      hasName: Boolean(lead.name?.trim()),
+      hasEmail: Boolean(lead.email?.trim()),
+      hasPhone: Boolean(lead.phone?.trim()),
+    });
+    return { sent: false, skipped: true, reason: "Lead contact details incomplete" };
   }
 
   console.info("[lead-notification] lead loaded from Supabase", {

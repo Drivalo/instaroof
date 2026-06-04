@@ -73,17 +73,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const leadRecord = mapRowToLeadRecord(data as Record<string, unknown>);
     const savedEmail = leadRecord.email?.trim() ?? "";
 
-    const boEmailResult = await sendLeadNotificationEmail(
-      leadId,
-      req.nextUrl.origin,
-      "contact_updated",
-    );
-    console.info("[leads/PATCH] company notification result", {
-      leadId,
-      sent: boEmailResult.sent,
-      skipped: boEmailResult.skipped ?? false,
-      reason: boEmailResult.reason ?? null,
-    });
+    let boEmailResult: Awaited<ReturnType<typeof sendLeadNotificationEmail>> = {
+      sent: false,
+      skipped: true,
+      reason: "Contact details not saved in this request",
+    };
+    if (savingContact) {
+      boEmailResult = await sendLeadNotificationEmail(
+        leadId,
+        req.nextUrl.origin,
+        "contact_updated",
+      );
+      console.info("[leads/PATCH] company notification result", {
+        leadId,
+        sent: boEmailResult.sent,
+        skipped: boEmailResult.skipped ?? false,
+        reason: boEmailResult.reason ?? null,
+      });
+    }
 
     let customerEmailResult: Awaited<ReturnType<typeof sendCustomerQuoteReadyEmail>> | null = null;
     if (savedEmail) {
