@@ -536,9 +536,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                   </>
                 ) : (
                   <RoofMaterialSingleEstimate
-                    materialId={String(lead.roof_material)}
-                    countryCode={customerCountry}
-                    address={customerAddress}
                     low={Number(lead.quote_standard_low) || 0}
                     high={Number(lead.quote_standard_high) || 0}
                     formatRange={formatStandardRange}
@@ -813,9 +810,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           ) : materialComplete ? (
             <div className="relative max-w-md">
               <RoofMaterialSingleEstimate
-                materialId={String(lead.roof_material)}
-                countryCode={customerCountry}
-                address={customerAddress}
                 low={Number(lead.quote_standard_low) || 0}
                 high={Number(lead.quote_standard_high) || 0}
                 formatRange={formatStandardRange}
