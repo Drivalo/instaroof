@@ -417,7 +417,7 @@ export default function AdminPage() {
                             onChange={(e) =>
                               void handleStatusChange(lead.id, e.target.value as AdminLeadStatus)
                             }
-                            className={`${selectClass} min-w-[120px] disabled:opacity-50`}
+                            className={`${selectClass} min-w-[140px] disabled:opacity-50`}
                             aria-label={`Status for ${displayValue(lead.name)}`}
                           >
                             {ADMIN_LEAD_STATUS_OPTIONS.map((o) => (
