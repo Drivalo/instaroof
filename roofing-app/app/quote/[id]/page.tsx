@@ -220,9 +220,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }, [lead]);
 
-  const showRoofEstimate =
-    lead?.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft));
-
   const saveGuttering = useCallback(
     async (value: boolean, choice: "yes" | "no") => {
       if (!id) return;
@@ -448,6 +445,45 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             <p className="mt-2 text-sm text-muted leading-relaxed">
               Enter your details to see your full price breakdown
             </p>
+            <div className="mt-4 rounded-lg border border-border-subtle bg-background/50 p-3 space-y-2 text-sm text-foreground">
+              <p>
+                Estimated roof area: <strong>{roofAreaDisplay.area}</strong>
+              </p>
+              {imperialRoofMeasurements ? (
+                <p>
+                  Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
+                </p>
+              ) : null}
+              <p>
+                Detected roof type: <strong>{lead.roof_type ?? "—"}</strong>
+              </p>
+              <p>
+                Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
+              </p>
+            </div>
+            <div className="mt-6 space-y-3">
+              <p className="text-sm text-muted leading-relaxed">
+                {gutteringInspectionQuestion(customerCountry)}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={savingGuttering}
+                  onClick={() => void saveGuttering(true, "yes")}
+                  className={gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase}
+                >
+                  Yes please
+                </button>
+                <button
+                  type="button"
+                  disabled={savingGuttering}
+                  onClick={() => void saveGuttering(false, "no")}
+                  className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
+                >
+                  No thanks
+                </button>
+              </div>
+            </div>
             <div className="mt-6 space-y-3">
               <p id="job-type-label" className="text-sm text-muted">
                 What best describes your situation?
@@ -651,34 +687,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
         </p>
       </div>
-
-      {showRoofEstimate ? (
-        <section className="mt-6 max-w-lg">
-          <p className="text-sm text-muted leading-relaxed">
-            {gutteringInspectionQuestion(customerCountry)}
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={savingGuttering}
-              onClick={() => void saveGuttering(true, "yes")}
-              className={
-                gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase
-              }
-            >
-              Yes please
-            </button>
-            <button
-              type="button"
-              disabled={savingGuttering}
-              onClick={() => void saveGuttering(false, "no")}
-              className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
-            >
-              No thanks
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
         <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
