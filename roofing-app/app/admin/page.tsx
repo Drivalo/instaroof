@@ -19,6 +19,8 @@ type AdminLead = {
   job_type: string | null;
   status: string | null;
   notes: string | null;
+  guttering?: boolean | null;
+  roof_material?: string | null;
   country_code?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -336,7 +338,7 @@ export default function AdminPage() {
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-border-subtle bg-surface">
-          <table className="min-w-[1100px] w-full text-left text-sm">
+          <table className="min-w-[1300px] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border-subtle text-muted">
                 <th className="px-4 py-3 font-normal whitespace-nowrap">Date</th>
@@ -345,6 +347,8 @@ export default function AdminPage() {
                 <th className="px-4 py-3 font-normal">Email</th>
                 <th className="px-4 py-3 font-normal min-w-[180px]">Address</th>
                 <th className="px-4 py-3 font-normal">Job type</th>
+                <th className="px-4 py-3 font-normal whitespace-nowrap">Roof material</th>
+                <th className="px-4 py-3 font-normal whitespace-nowrap">Guttering</th>
                 <th className="px-4 py-3 font-normal whitespace-nowrap">Status</th>
                 <th className="px-4 py-3 font-normal min-w-[200px]">Notes</th>
               </tr>
@@ -352,7 +356,7 @@ export default function AdminPage() {
             <tbody>
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted">
+                  <td colSpan={10} className="px-4 py-10 text-center text-muted">
                     No leads match your filters.
                   </td>
                 </tr>
@@ -400,6 +404,12 @@ export default function AdminPage() {
                             {jobTypeEmoji(lead.job_type)}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                          {displayValue(lead.roof_material)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                          {lead.guttering == null ? "—" : lead.guttering ? "Yes" : "No"}
+                        </td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <select
                             value={normalizeAdminLeadStatus(lead.status)}
@@ -445,7 +455,7 @@ export default function AdminPage() {
                       </tr>
                       {expanded ? (
                         <tr key={`${lead.id}-detail`} className="border-b border-border-subtle bg-background/50">
-                          <td colSpan={8} className="px-4 py-4">
+                          <td colSpan={10} className="px-4 py-4">
                             <LeadDetailPanel lead={lead} />
                           </td>
                         </tr>
@@ -473,6 +483,8 @@ function LeadDetailPanel({ lead }: { lead: AdminLead }) {
     { label: "Email", value: displayValue(lead.email) },
     { label: "Address", value: lead.address },
     { label: "Job type", value: displayValue(lead.job_type) },
+    { label: "Roof material", value: displayValue(lead.roof_material) },
+    { label: "Guttering", value: lead.guttering == null ? "—" : lead.guttering ? "Yes" : "No" },
     { label: "Status", value: normalizeAdminLeadStatus(lead.status) },
     { label: "Notes", value: displayValue(lead.notes) },
     { label: "Country", value: displayValue(lead.country_code) },
