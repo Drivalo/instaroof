@@ -32,7 +32,6 @@ export default function Home() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
-  const [previewMaterial, setPreviewMaterial] = useState<string | null>(null);
   const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -90,7 +89,6 @@ export default function Home() {
     setLoadingPreview(true);
     setPreviewRoofLabel(null);
     setPreviewPriceRange(null);
-    setPreviewMaterial(null);
 
     try {
       const res = await fetch("/api/leads/preview-estimate", {
@@ -109,7 +107,6 @@ export default function Home() {
       }
       setPreviewRoofLabel(data.area?.label ?? `${data.roof_sqft} sq ft`);
       setPreviewPriceRange(data.price_range ?? null);
-      setPreviewMaterial(data.material ?? null);
     } catch (err) {
       console.error("[createLead] preview estimate failed:", err);
       const message = err instanceof Error ? err.message : "Could not estimate roof size. Please try again.";
@@ -275,7 +272,7 @@ export default function Home() {
               <p className="text-xs uppercase tracking-[0.2em] text-accent">Your estimate</p>
               <h2 className="text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <div className="mt-8 grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Estimated roof size</p>
                   <p className="mt-1 text-lg text-foreground">
@@ -286,12 +283,6 @@ export default function Home() {
                   <p className="text-sm text-muted">Price range</p>
                   <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
-                  <p className="text-sm text-muted">Recommended material</p>
-                  <p className="mt-1 text-lg text-foreground">
-                    {loadingPreview ? "…" : previewMaterial ?? "—"}
                   </p>
                 </div>
               </div>
