@@ -188,13 +188,13 @@ function buildHtml(
                 A roofing specialist from ${companyName} will meet you at the property at the scheduled time.
               </p>
               <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
-                Final price is confirmed at your inspection. There is no obligation to proceed.
+                Final price is confirmed at your inspection.
               </p>`
     : `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#a0a0a0;">
                 A roofing specialist from ${companyName} will be in touch shortly to answer any questions.
               </p>
               <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
-                Final price is confirmed at your free inspection. Book with no obligation when you are ready.
+                Final price is confirmed at your free inspection.
               </p>`;
 
   return `
@@ -301,12 +301,12 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
   if (booked) {
     lines.push(
       `A roofing specialist from ${companyName} will meet you at the property at the scheduled time.`,
-      "Final price is confirmed at your inspection. There is no obligation to proceed.",
+      "Final price is confirmed at your inspection.",
     );
   } else {
     lines.push(
       `A roofing specialist from ${companyName} will be in touch shortly.`,
-      "Final price is confirmed at your free inspection. Book with no obligation when you are ready.",
+      "Final price is confirmed at your free inspection.",
     );
   }
 
