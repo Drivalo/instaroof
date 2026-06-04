@@ -147,7 +147,6 @@ export function analyzingProgressSteps(region: CurrencyRegion): string[] {
     "Capturing satellite imagery...",
     `${verb} roof outline...`,
     "Measuring square footage...",
-    "Detecting roof material...",
     "Calculating quote...",
   ];
 }
