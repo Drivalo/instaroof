@@ -4,9 +4,15 @@
 import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { SatelliteRoofMap } from "@/components/satellite-roof-map";
+import {
+  RoofMaterialComparisonTable,
+  RoofMaterialSelector,
+  RoofMaterialSingleEstimate,
+} from "@/components/roof-material-panel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { gutteringInspectionQuestion } from "@/lib/guttering-inspection";
 import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
+import { isRoofMaterialNotSure } from "@/lib/roof-material";
 import { formatRoofAreaLabel, formatRoofSquares, usesImperialRoofDisplay } from "@/lib/roof-estimate";
 import { SettingsRow } from "@/lib/types";
 
@@ -159,6 +165,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [jobType, setJobType] = useState<JobType | "">("");
   const [gutteringChoice, setGutteringChoice] = useState<"yes" | "no" | null>(null);
   const [savingGuttering, setSavingGuttering] = useState(false);
+  const [savingMaterial, setSavingMaterial] = useState(false);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -210,15 +218,57 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     setContact({ name, email, phone });
     if (isValidJobType(savedJobType)) setJobType(savedJobType);
     if (lead.guttering === true) setGutteringChoice("yes");
+    const savedMaterial = lead.roof_material ? String(lead.roof_material) : null;
+    if (savedMaterial) setSelectedMaterialId(savedMaterial);
     if (
       name.trim() &&
       isValidEmail(email) &&
       isValidPhone(phone) &&
-      isValidJobType(savedJobType)
+      isValidJobType(savedJobType) &&
+      savedMaterial
     ) {
       setDetailsUnlocked(true);
     }
   }, [lead]);
+
+  const materialComplete = Boolean(lead?.roof_material);
+  const materialNotSure = isRoofMaterialNotSure(lead?.roof_material);
+  const roofSqftNumeric = Number(lead?.roof_sqft);
+  const hasRoofSqft = Number.isFinite(roofSqftNumeric) && roofSqftNumeric > 0;
+
+  const formatStandardRange = useCallback(
+    (low: number, high: number) =>
+      formatQuotePriceRange(low, high, customerAddress, settings, customerCountry),
+    [customerAddress, settings, customerCountry],
+  );
+
+  const saveRoofMaterial = useCallback(
+    async (materialId: string) => {
+      if (!id) return;
+      setSelectedMaterialId(materialId);
+      setSavingMaterial(true);
+      try {
+        const res = await fetch(`/api/leads/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roof_material: materialId }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          console.error("[quote] saveRoofMaterial failed", { leadId: id, error: data.error });
+          alert(data.error || "Could not save your roof type. Please try again.");
+          return;
+        }
+        if (data.lead) setLead(data.lead);
+      } catch (err) {
+        console.error("[quote] saveRoofMaterial failed", err);
+        alert("Could not save your roof type. Please try again.");
+      } finally {
+        setSavingMaterial(false);
+      }
+    },
+    [id],
+  );
 
   const saveGuttering = useCallback(
     async (value: boolean, choice: "yes" | "no") => {
@@ -247,6 +297,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   );
 
   const contactReady =
+    materialComplete &&
     contact.name.trim().length > 0 &&
     isValidEmail(contact.email) &&
     isValidPhone(contact.phone) &&
@@ -443,7 +494,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               Your estimate is ready
             </h2>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Enter your details to see your full price breakdown
+              Select your roof type, then enter your details to see your price breakdown
             </p>
             <div className="mt-4 rounded-lg border border-border-subtle bg-background/50 p-3 space-y-2 text-sm text-foreground">
               <p>
@@ -455,12 +506,48 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 </p>
               ) : null}
               <p>
-                Detected roof type: <strong>{lead.roof_type ?? "—"}</strong>
-              </p>
-              <p>
                 Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
               </p>
             </div>
+            <div className="mt-6 space-y-3">
+              <p id="roof-material-label" className="text-sm text-muted">
+                What type of roof do you have?
+              </p>
+              <RoofMaterialSelector
+                countryCode={customerCountry}
+                address={customerAddress}
+                selectedId={selectedMaterialId}
+                disabled={savingMaterial}
+                onSelect={(materialId) => void saveRoofMaterial(materialId)}
+              />
+            </div>
+            {materialComplete && hasRoofSqft && settings ? (
+              <div className="mt-4">
+                {materialNotSure ? (
+                  <>
+                    <p className="text-sm text-muted mb-2">Compare materials (full replacement)</p>
+                    <RoofMaterialComparisonTable
+                      countryCode={customerCountry}
+                      address={customerAddress}
+                      roofSqft={roofSqftNumeric}
+                      settings={settings}
+                      formatRange={formatStandardRange}
+                    />
+                  </>
+                ) : (
+                  <RoofMaterialSingleEstimate
+                    materialId={String(lead.roof_material)}
+                    countryCode={customerCountry}
+                    address={customerAddress}
+                    low={Number(lead.quote_standard_low) || 0}
+                    high={Number(lead.quote_standard_high) || 0}
+                    formatRange={formatStandardRange}
+                  />
+                )}
+              </div>
+            ) : null}
+            {materialComplete ? (
+              <>
             <div className="mt-6 space-y-3">
               <p className="text-sm text-muted leading-relaxed">
                 {gutteringInspectionQuestion(customerCountry)}
@@ -573,6 +660,10 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             >
               {savingContact ? "Saving…" : "See my quote"}
             </button>
+              </>
+            ) : (
+              <p className="mt-4 text-sm text-muted">Select your roof type above to continue.</p>
+            )}
           </div>
         </div>
       )}
@@ -680,10 +771,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
           </p>
         ) : null}
-        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
-          Detected roof type: <strong>{lead.roof_type ?? "—"}</strong>
-        </p>
-        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground md:col-span-2">
           Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
         </p>
       </div>
@@ -708,80 +796,50 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             </Link>
           )}
         </div>
-      ) : (
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
-            <h3>Repair Estimate</h3>
-            <div className="relative mt-2 min-h-[2.75rem]">
-              <p
-                className={`text-2xl text-foreground ${!detailsUnlocked ? "blur-[16px] select-none" : ""}`}
-                aria-hidden={!detailsUnlocked}
-              >
-                {formatQuotePriceRange(
-                  lead.quote_repair_low,
-                  lead.quote_repair_high,
-                  customerAddress,
-                  settings,
-                  customerCountry,
-                )}
-              </p>
-              {!detailsUnlocked ? (
-                <p className="absolute inset-0 flex items-center justify-center px-2 text-center text-sm font-medium leading-snug text-foreground">
-                  Enter your details to reveal your quote
-                </p>
-              ) : null}
+      ) : settings && hasRoofSqft ? (
+        <div className="mt-6 relative">
+          {materialNotSure ? (
+            <div className="relative">
+              <p className="text-sm text-muted mb-3">Compare materials (full replacement)</p>
+              <RoofMaterialComparisonTable
+                countryCode={customerCountry}
+                address={customerAddress}
+                roofSqft={roofSqftNumeric}
+                settings={settings}
+                formatRange={formatStandardRange}
+                blurred={!detailsUnlocked}
+              />
             </div>
-          </div>
-          <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
-            <h3>Full Replacement - Standard</h3>
-            <div className="relative mt-2 min-h-[2.75rem]">
-              <p
-                className={`text-2xl text-foreground ${!detailsUnlocked ? "blur-[16px] select-none" : ""}`}
-                aria-hidden={!detailsUnlocked}
-              >
-                {formatQuotePriceRange(
-                  lead.quote_standard_low,
-                  lead.quote_standard_high,
-                  customerAddress,
-                  settings,
-                  customerCountry,
-                )}
-              </p>
-              {!detailsUnlocked ? (
-                <p className="absolute inset-0 flex items-center justify-center px-2 text-center text-sm font-medium leading-snug text-foreground">
-                  Enter your details to reveal your quote
-                </p>
-              ) : null}
+          ) : materialComplete ? (
+            <div className="relative max-w-md">
+              <RoofMaterialSingleEstimate
+                materialId={String(lead.roof_material)}
+                countryCode={customerCountry}
+                address={customerAddress}
+                low={Number(lead.quote_standard_low) || 0}
+                high={Number(lead.quote_standard_high) || 0}
+                formatRange={formatStandardRange}
+                blurred={!detailsUnlocked}
+              />
             </div>
-          </div>
-          <div className="rounded-xl border border-border-subtle bg-surface p-4 text-foreground">
-            <h3>Full Replacement - Premium</h3>
-            <div className="relative mt-2 min-h-[2.75rem]">
-              <p
-                className={`text-2xl text-foreground ${!detailsUnlocked ? "blur-[16px] select-none" : ""}`}
-                aria-hidden={!detailsUnlocked}
-              >
-                {formatQuotePriceRange(
-                  lead.quote_premium_low,
-                  lead.quote_premium_high,
-                  customerAddress,
-                  settings,
-                  customerCountry,
-                )}
-              </p>
-              {!detailsUnlocked ? (
-                <p className="absolute inset-0 flex items-center justify-center px-2 text-center text-sm font-medium leading-snug text-foreground">
-                  Enter your details to reveal your quote
-                </p>
-              ) : null}
+          ) : (
+            <div className="rounded-xl border border-border-subtle bg-surface p-6 text-muted text-sm">
+              Select your roof type in the popup to see your personalised estimate.
             </div>
-          </div>
+          )}
+          {!detailsUnlocked ? (
+            <p className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-medium leading-snug text-foreground pointer-events-none min-h-[120px]">
+              {materialComplete
+                ? "Enter your details to reveal your quote"
+                : "Select your roof type and enter your details to reveal your quote"}
+            </p>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       {hasQuoteEstimates && !detailsUnlocked && (
         <p className="mt-3 text-sm text-muted leading-relaxed">
-          Enter your details above to view your full price breakdown.
+          Select your roof type and enter your details to view your price breakdown.
         </p>
       )}
 

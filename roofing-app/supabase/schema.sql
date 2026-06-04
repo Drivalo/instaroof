@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS leads (
   satellite_image_url TEXT,
   roof_sqft INTEGER,
   roof_type TEXT,
+  roof_material TEXT,
   roof_complexity TEXT,
   vision_confidence INTEGER,
   polygon_coordinates JSONB NOT NULL DEFAULT '[]'::JSONB,

@@ -10,6 +10,7 @@ import {
 } from "@/lib/roof-estimate";
 import { gutteringInspectionRequestedLine } from "@/lib/guttering-inspection";
 import { isEmergencyJobType, jobTypeLabel } from "@/lib/job-type";
+import { roofMaterialLabel } from "@/lib/roof-material";
 import { getSettings, getSupabaseAdmin } from "@/lib/supabase";
 import { SettingsRow } from "@/lib/types";
 
@@ -32,6 +33,7 @@ type LeadRecord = {
   email?: string | null;
   phone?: string | null;
   job_type?: string | null;
+  roof_material?: string | null;
   guttering?: boolean | null;
   address: string;
   country_code?: string | null;
@@ -160,6 +162,10 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Situation</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${jobTypeLabel(lead.job_type)}</td></tr>`
     : "";
 
+  const roofMaterialRow = lead.roof_material
+    ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Roof material</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${roofMaterialLabel(lead.roof_material, lead.country_code, lead.address)}</td></tr>`
+    : "";
+
   const gutteringRow =
     lead.guttering === true
       ? `<tr><td colspan="2" style="padding:8px 12px;border:1px solid #e8e8e6;"><strong>${gutteringInspectionRequestedLine(lead.country_code)}</strong></td></tr>`
@@ -177,6 +183,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Email</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.email)}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Phone</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.phone)}</td></tr>
     ${jobTypeRow}
+    ${roofMaterialRow}
     ${gutteringRow}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Address</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.address}</td></tr>
     ${appointmentRows}
@@ -198,6 +205,9 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     ? ["⚠️ URGENT — customer has an active leak.", ""]
     : [];
   const jobTypeLine = lead.job_type ? [`Situation: ${jobTypeLabel(lead.job_type)}`] : [];
+  const roofMaterialLine = lead.roof_material
+    ? [`Roof material: ${roofMaterialLabel(lead.roof_material, lead.country_code, lead.address)}`]
+    : [];
   const gutteringLine =
     lead.guttering === true ? [gutteringInspectionRequestedLine(lead.country_code)] : [];
   return [
@@ -208,6 +218,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     `Email: ${displayValue(lead.email)}`,
     `Phone: ${displayValue(lead.phone)}`,
     ...jobTypeLine,
+    ...roofMaterialLine,
     ...gutteringLine,
     `Address: ${lead.address}`,
     ...(appointment

@@ -3,8 +3,15 @@ import { ensureEnvLoaded } from "@/lib/env.server";
 import { mapRowToLeadRecord, sendCustomerQuoteReadyEmail } from "@/lib/customer-quote-email";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { isValidJobType } from "@/lib/job-type";
+import {
+  isValidRoofMaterialForLead,
+  isRoofMaterialNotSure,
+  roofMaterialToRoofType,
+  ROOF_MATERIAL_NOT_SURE,
+} from "@/lib/roof-material";
+import { calcQuoteRanges } from "@/lib/quote";
 import { satelliteImageSrcForLead } from "@/lib/maps-static";
-import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
+import { getSettings, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   ensureEnvLoaded();
@@ -27,14 +34,46 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const { name, email, phone, job_type, guttering } = body;
+    const { name, email, phone, job_type, guttering, roof_material } = body;
 
-    const updates: Record<string, string | boolean> = {};
+    const supabase = getSupabaseAdmin();
+    const { data: existingLead, error: fetchError } = await supabase
+      .from("leads")
+      .select("roof_sqft, country_code, address, roof_material")
+      .eq("id", leadId)
+      .maybeSingle();
+
+    if (fetchError || !existingLead) {
+      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    }
+
+    const updates: Record<string, string | boolean | number> = {};
     if (typeof name === "string" && name.trim()) updates.name = name.trim();
     if (typeof email === "string" && email.trim()) updates.email = email.trim();
     if (typeof phone === "string" && phone.trim()) updates.phone = phone.trim();
     if (isValidJobType(job_type)) updates.job_type = job_type;
     if (typeof guttering === "boolean") updates.guttering = guttering;
+
+    if (typeof roof_material === "string" && roof_material.trim()) {
+      const material = roof_material.trim();
+      if (
+        !isValidRoofMaterialForLead(
+          material,
+          existingLead.country_code,
+          existingLead.address,
+        )
+      ) {
+        return NextResponse.json({ error: "Invalid roof material" }, { status: 400 });
+      }
+      updates.roof_material = material;
+      const sqft = Number(existingLead.roof_sqft);
+      if (Number.isFinite(sqft) && sqft > 0 && !isRoofMaterialNotSure(material)) {
+        const settings = await getSettings();
+        const quotes = calcQuoteRanges(sqft, roofMaterialToRoofType(material), settings);
+        Object.assign(updates, quotes);
+        updates.roof_type = roofMaterialToRoofType(material);
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
@@ -44,8 +83,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (savingContact && !updates.job_type) {
       return NextResponse.json({ error: "Please select what best describes your situation" }, { status: 400 });
     }
-
-    const supabase = getSupabaseAdmin();
+    if (savingContact && !existingLead.roof_material && !updates.roof_material) {
+      return NextResponse.json({ error: "Please select your roof material" }, { status: 400 });
+    }
     const { data, error } = await supabase
       .from("leads")
       .update(updates)
