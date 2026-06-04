@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  estimateRoofSqftFromAddress,
-  estimateRoofSqftFromCoordinates,
+  estimateStage1RoofSqftFromCountry,
   formatRoofAreaDisplay,
   previewMaterialForRegion,
   previewPriceRangeFromEstimate,
+  STAGE1_ROOF_SIZE_LABEL,
 } from "@/lib/roof-estimate";
 import { getSettings, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const latitude = Number(body.latitude);
-    const longitude = Number(body.longitude);
     const address = typeof body.address === "string" ? body.address : "";
     const countryCode = typeof body.country_code === "string" ? body.country_code : null;
     const leadId = Number(body.lead_id);
@@ -34,32 +32,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const hasCoords =
-      Number.isFinite(latitude) &&
-      Number.isFinite(longitude) &&
-      !(latitude === 0 && longitude === 0);
-
-    let roof_sqft = 0;
-    let source: "coordinates" | "address" = "address";
-
-    if (hasCoords) {
-      roof_sqft = estimateRoofSqftFromCoordinates(latitude, longitude);
-      source = "coordinates";
-    } else if (address.trim()) {
-      roof_sqft = estimateRoofSqftFromAddress(address);
-      source = "address";
-    } else {
+    if (!address.trim() && !countryCode) {
       return NextResponse.json(
         { error: "Enter an address or select one from the dropdown" },
         { status: 400 },
       );
     }
 
+    const roof_sqft = estimateStage1RoofSqftFromCountry(countryCode, address);
     const area = formatRoofAreaDisplay(roof_sqft, address, countryCode);
 
     return NextResponse.json({
       roof_sqft,
-      source,
+      source: "regional_median",
+      roof_size_label: STAGE1_ROOF_SIZE_LABEL,
       area,
       material: previewMaterialForRegion(address, countryCode),
       price_range: previewPriceRangeFromEstimate(roof_sqft, address, settings, countryCode),

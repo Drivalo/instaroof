@@ -271,7 +271,7 @@ export default function Home() {
 
               <div className="mt-8 grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
-                  <p className="text-sm text-muted">Estimated roof size</p>
+                  <p className="text-sm text-muted">Estimated roof size (typical for your area)</p>
                   <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
                   </p>
@@ -289,7 +289,8 @@ export default function Home() {
 
               {!loadingPreview && previewRoofLabel && (
                 <p className="mt-6 text-sm text-muted leading-relaxed">
-                  A quick estimate from your property location. Full satellite analysis refines your quote when you continue.
+                  A regional average for homes in your area, not a measurement of your property. Full satellite
+                  AI analysis measures your actual roof when you continue.
                 </p>
               )}
 

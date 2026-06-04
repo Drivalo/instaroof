@@ -2,6 +2,68 @@ import { DEFAULT_SETTINGS } from "@/lib/defaults";
 import { calcQuoteRanges } from "@/lib/quote";
 import { SettingsRow } from "@/lib/types";
 
+/** Stage 1 label shown before AI satellite analysis. */
+export const STAGE1_ROOF_SIZE_LABEL = "Estimated roof size (typical for your area)";
+
+/** Internal sq ft ↔ m² display (matches formatRoofAreaDisplay). */
+const SQFT_PER_SQM = 0.092903;
+
+const STAGE1_MEDIAN_ROOF_SQM: Record<string, number> = {
+  GB: 90,
+  AU: 180,
+  NZ: 160,
+  US: 200,
+  CA: 185,
+};
+
+function normalizeStage1CountryCode(
+  countryCode?: string | null,
+  address?: string | null,
+): keyof typeof STAGE1_MEDIAN_ROOF_SQM | "DEFAULT" {
+  const code = String(countryCode ?? "")
+    .trim()
+    .toUpperCase();
+  if (code === "UK" || code === "GB") return "GB";
+  if (code === "AU" || code === "AUS") return "AU";
+  if (code === "NZ" || code === "NZL") return "NZ";
+  if (code === "US" || code === "USA") return "US";
+  if (code === "CA") return "CA";
+
+  const addr = String(address ?? "").toLowerCase();
+  if (addr.includes("united kingdom") || /\buk\b/.test(addr) || addr.includes(", uk")) return "GB";
+  if (addr.includes("australia")) return "AU";
+  if (addr.includes("new zealand")) return "NZ";
+  if (addr.includes("canada") || /,\s*canada\s*$/i.test(String(address ?? ""))) return "CA";
+  if (
+    addr.includes("united states") ||
+    /\b(usa|u\.s\.a\.)\b/.test(addr) ||
+    /,\s*(usa|united states)\s*$/i.test(String(address ?? ""))
+  ) {
+    return "US";
+  }
+
+  return "DEFAULT";
+}
+
+/** Stage 1 regional median roof area (m²) before AI analysis. */
+export function stage1MedianRoofSqm(
+  countryCode?: string | null,
+  address?: string | null,
+): number {
+  const region = normalizeStage1CountryCode(countryCode, address);
+  if (region === "DEFAULT") return 120;
+  return STAGE1_MEDIAN_ROOF_SQM[region];
+}
+
+/** Stage 1 roof size stored as internal sq ft (derived from regional median m²). */
+export function estimateStage1RoofSqftFromCountry(
+  countryCode?: string | null,
+  address?: string | null,
+): number {
+  const sqm = stage1MedianRoofSqm(countryCode, address);
+  return Math.round(sqm / SQFT_PER_SQM);
+}
+
 /** Deterministic roof size (sq ft) from address text when coordinates are unavailable. */
 export function estimateRoofSqftFromAddress(address: string): number {
   const normalized = address.trim().toLowerCase();
@@ -60,8 +122,6 @@ export function usesImperialRoofDisplay(
 export function usesMetricRoofDisplay(address?: string | null, countryCode?: string | null): boolean {
   return !usesImperialRoofDisplay(countryCode, address);
 }
-
-const SQFT_PER_SQM = 0.092903;
 
 export function formatRoofAreaDisplay(
   roofSqft: number,
