@@ -5,6 +5,7 @@ import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { SatelliteRoofMap } from "@/components/satellite-roof-map";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { gutteringInspectionQuestion } from "@/lib/guttering-inspection";
 import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
 import { formatRoofAreaLabel, formatRoofSquares, usesImperialRoofDisplay } from "@/lib/roof-estimate";
 import { SettingsRow } from "@/lib/types";
@@ -156,6 +157,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [jobType, setJobType] = useState<JobType | "">("");
+  const [gutteringChoice, setGutteringChoice] = useState<"yes" | "no" | null>(null);
+  const [savingGuttering, setSavingGuttering] = useState(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -206,6 +209,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     const savedJobType = lead.job_type;
     setContact({ name, email, phone });
     if (isValidJobType(savedJobType)) setJobType(savedJobType);
+    if (lead.guttering === true) setGutteringChoice("yes");
     if (
       name.trim() &&
       isValidEmail(email) &&
@@ -215,6 +219,35 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       setDetailsUnlocked(true);
     }
   }, [lead]);
+
+  const showRoofEstimate =
+    lead?.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft));
+
+  const saveGuttering = useCallback(
+    async (value: boolean, choice: "yes" | "no") => {
+      if (!id) return;
+      setGutteringChoice(choice);
+      setSavingGuttering(true);
+      try {
+        const res = await fetch(`/api/leads/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ guttering: value }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          console.error("[quote] saveGuttering failed", { leadId: id, error: data.error });
+          return;
+        }
+        if (data.lead) setLead(data.lead);
+      } catch (err) {
+        console.error("[quote] saveGuttering failed", err);
+      } finally {
+        setSavingGuttering(false);
+      }
+    },
+    [id],
+  );
 
   const contactReady =
     contact.name.trim().length > 0 &&
@@ -264,7 +297,13 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       const res = await fetch(`/api/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone, job_type: jobType }),
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          job_type: jobType,
+          guttering: gutteringChoice === "yes",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -612,6 +651,34 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
         </p>
       </div>
+
+      {showRoofEstimate ? (
+        <section className="mt-6 max-w-lg">
+          <p className="text-sm text-muted leading-relaxed">
+            {gutteringInspectionQuestion(customerCountry)}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={savingGuttering}
+              onClick={() => void saveGuttering(true, "yes")}
+              className={
+                gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase
+              }
+            >
+              Yes please
+            </button>
+            <button
+              type="button"
+              disabled={savingGuttering}
+              onClick={() => void saveGuttering(false, "no")}
+              className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
+            >
+              No thanks
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
         <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
