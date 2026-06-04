@@ -31,7 +31,6 @@ export default function Home() {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
-  const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -88,7 +87,6 @@ export default function Home() {
     setMockQuoteVisible(true);
     setLoadingPreview(true);
     setPreviewRoofLabel(null);
-    setPreviewPriceRange(null);
 
     try {
       const res = await fetch("/api/leads/preview-estimate", {
@@ -106,7 +104,6 @@ export default function Home() {
         throw new Error(data.error || "Could not estimate roof size");
       }
       setPreviewRoofLabel(data.area?.label ?? `${data.roof_sqft} sq ft`);
-      setPreviewPriceRange(data.price_range ?? null);
     } catch (err) {
       console.error("[createLead] preview estimate failed:", err);
       const message = err instanceof Error ? err.message : "Could not estimate roof size. Please try again.";
@@ -280,13 +277,12 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
-                  <p className="text-sm text-muted">Price range</p>
-                  <p className="mt-1 text-xs text-muted">Quick estimate based on your postcode</p>
+                  <p className="text-sm text-muted">Your quote</p>
                   <p className="mt-1 text-lg text-foreground">
-                    {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
+                    {loadingPreview ? "Preparing your quote…" : "Your quote is being prepared"}
                   </p>
                   <p className="mt-2 text-xs text-muted leading-relaxed">
-                    This will be refined once we analyse your roof via satellite imagery.
+                    Pricing is available after full satellite analysis.
                   </p>
                 </div>
               </div>
