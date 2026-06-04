@@ -7,10 +7,16 @@ function normalizeCountryCode(countryCode: string | null | undefined): string {
 /** Localised prompt shown on the quote results page. */
 export function gutteringInspectionQuestion(countryCode: string | null | undefined): string {
   const code = normalizeCountryCode(countryCode);
-  if (code === "NZ") return "Would you also like a spouting inspection quoted?";
-  if (code === "US" || code === "CA") return "Would you also like a gutters inspection quoted?";
-  if (code === "GB" || code === "AU") return "Would you also like a guttering inspection quoted?";
-  return "Would you also like a guttering inspection quoted?";
+  if (code === "NZ") {
+    return "Would you also like a free spouting inspection included with your roof survey?";
+  }
+  if (code === "US" || code === "CA") {
+    return "Would you also like a free gutters inspection included with your roof survey?";
+  }
+  if (code === "GB" || code === "AU") {
+    return "Would you also like a free guttering inspection included with your roof survey?";
+  }
+  return "Would you also like a free guttering inspection included with your roof survey?";
 }
 
 /** Noun used in business owner notification (e.g. "Guttering inspection requested: Yes"). */
