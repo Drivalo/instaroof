@@ -27,12 +27,8 @@ export default function Home() {
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [placeDetails, setPlaceDetails] = useState<AddressPlaceDetails | null>(null);
   const [placeConfirmed, setPlaceConfirmed] = useState(false);
-  const [mockQuoteVisible, setMockQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const addressInputRef = useRef<AddressFieldHandle>(null);
-  const previewSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     fetch("/api/public/bootstrap")
@@ -45,11 +41,6 @@ export default function Home() {
 
   const companyName = bootstrap?.settings?.company_name ?? "Nimly";
   const companyLogo = bootstrap?.settings?.company_logo_url;
-
-  useEffect(() => {
-    if (!mockQuoteVisible || !previewSectionRef.current) return;
-    previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [mockQuoteVisible]);
 
   function hasValidCoords(lat?: number, lng?: number) {
     return (
@@ -66,61 +57,14 @@ export default function Home() {
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const primaryCtaEnabled = hasValidAddress && !loadingPreview;
+  const primaryCtaEnabled = hasValidAddress && !loadingAnalysis;
 
   async function handlePrimaryCta() {
     if (!addressInputRef.current?.validateForSubmit()) return;
-    await createLead();
+    await startRoofAnalysis();
   }
 
-  async function createLead() {
-    if (!addressInputRef.current?.validateForSubmit()) return;
-
-    const details = addressInputRef.current.getPlaceDetails() ?? placeDetails;
-    if (!details || !hasValidCoords(details.latitude, details.longitude)) {
-      return;
-    }
-
-    const lat = details.latitude;
-    const lng = details.longitude;
-
-    setMockQuoteVisible(true);
-    setLoadingPreview(true);
-    setPreviewRoofLabel(null);
-
-    try {
-      const res = await fetch("/api/leads/preview-estimate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: details.address,
-          latitude: lat,
-          longitude: lng,
-          country_code: details.countryCode ?? null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Could not estimate roof size");
-      }
-      setPreviewRoofLabel(data.area?.label ?? `${data.roof_sqft} sq ft`);
-    } catch (err) {
-      console.error("[createLead] preview estimate failed:", err);
-      const message = err instanceof Error ? err.message : "Could not estimate roof size. Please try again.";
-      const isAddressSelectionError =
-        message.toLowerCase().includes("dropdown") || message.toLowerCase().includes("select an address");
-      if (isAddressSelectionError) {
-        addressInputRef.current?.validateForSubmit();
-      } else {
-        alert(message);
-      }
-      setMockQuoteVisible(false);
-    } finally {
-      setLoadingPreview(false);
-    }
-  }
-
-  async function createRealLead() {
+  async function startRoofAnalysis() {
     if (!addressInputRef.current?.validateForSubmit()) return;
 
     const details = addressInputRef.current.getPlaceDetails() ?? placeDetails;
@@ -247,7 +191,7 @@ export default function Home() {
                 disabled={!primaryCtaEnabled}
                 className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
+                {loadingAnalysis ? "Starting analysis…" : "Analyse my roof"}
               </button>
             </div>
 
@@ -260,57 +204,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Preview quote */}
-      {mockQuoteVisible && (
-        <section ref={previewSectionRef} className="pb-16 md:pb-20">
-          <div className="container-max">
-            <div className="rounded-lg border border-border-subtle bg-surface p-8 md:p-10">
-              <p className="text-xs uppercase tracking-[0.2em] text-accent">Your estimate</p>
-              <h2 className="text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
-
-              <div className="mt-8 grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
-                  <p className="text-sm text-muted">Estimated roof size (typical for your area)</p>
-                  <p className="mt-1 text-lg text-foreground">
-                    {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
-                  <p className="text-sm text-muted">Your quote</p>
-                  <p className="mt-1 text-lg text-foreground">
-                    {loadingPreview ? "Preparing your quote…" : "Your quote is being prepared"}
-                  </p>
-                  <p className="mt-2 text-xs text-muted leading-relaxed">
-                    Pricing is available after full satellite analysis.
-                  </p>
-                </div>
-              </div>
-
-              {!loadingPreview && previewRoofLabel && (
-                <p className="mt-6 text-sm text-muted leading-relaxed">
-                  A regional average for homes in your area, not a measurement of your property. Full satellite
-                  AI analysis measures your actual roof when you continue.
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={createRealLead}
-                disabled={
-                  loadingAnalysis ||
-                  loadingPreview ||
-                  !previewRoofLabel ||
-                  !hasValidAddress
-                }
-                className="mt-8 btn-accent rounded-lg px-6 py-3 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loadingAnalysis ? "Starting analysis…" : "Continue with full AI analysis"}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* How it works */}
       <section className="py-16 md:py-20 border-t border-border-subtle">

@@ -149,6 +149,43 @@ function formatDepositPrice(
   }
 }
 
+/** Placeholder only; real quote amounts are not shown before contact unlock. */
+function placeholderQuoteRangeLabel(address: string, countryCode?: string | null): string {
+  const currency = detectQuoteCurrency(address, countryCode);
+  switch (currency) {
+    case "GB":
+      return "£XX,XXX - £XX,XXX";
+    case "AU":
+      return "A$XX,XXX - A$XX,XXX";
+    case "NZ":
+      return "NZ$XX,XXX - NZ$XX,XXX";
+    case "CA":
+      return "C$XX,XXX - C$XX,XXX";
+    default:
+      return "$XX,XXX - $XX,XXX";
+  }
+}
+
+function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
 export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
@@ -382,12 +419,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     console.info("[quote] showBookingModal set to true", { source: "button" });
   }, []);
 
-  async function handleSeeMyQuote() {
+  async function handleRevealQuote() {
     const saved = await saveContactDetails();
     if (saved) {
-      console.info("[quote] first modal closed — quote revealed");
+      console.info("[quote] contact saved — quote revealed");
     } else {
-      console.warn("[quote] first modal submit failed");
+      console.warn("[quote] reveal quote submit failed");
     }
   }
 
@@ -457,19 +494,19 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     if (!satelliteSrc) setSatelliteReady(true);
   }, [satelliteSrc]);
 
-  const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
   const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
   const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
+  const showGatedFlow = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
+  const placeholderRange = placeholderQuoteRangeLabel(customerAddress, customerCountry);
 
   useEffect(() => {
-    const lockScroll = showDetailsModal || showBookingModal;
-    if (!lockScroll) return;
+    if (!showBookingModal) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [showDetailsModal, showBookingModal]);
+  }, [showBookingModal]);
 
   if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
 
@@ -482,189 +519,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <main className="customer-page container-max py-8 relative">
-      {showDetailsModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 pointer-events-none overflow-y-auto overscroll-contain"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="quote-details-modal-title"
-        >
-          <div className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl my-4 sm:my-0 pointer-events-auto">
-            <h2 id="quote-details-modal-title" className="text-xl md:text-2xl text-foreground">
-              Your estimate is ready
-            </h2>
-            <p className="mt-2 text-sm text-muted leading-relaxed">
-              Select your roof type, then enter your details to see your price breakdown
-            </p>
-            <div className="mt-4 rounded-lg border border-border-subtle bg-background/50 p-3 space-y-2 text-sm text-foreground">
-              <p>
-                Estimated roof area: <strong>{roofAreaDisplay.area}</strong>
-              </p>
-              {imperialRoofMeasurements ? (
-                <p>
-                  Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
-                </p>
-              ) : null}
-              <p>
-                Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
-              </p>
-            </div>
-            <div className="mt-6 space-y-3">
-              <p id="roof-material-label" className="text-sm text-muted">
-                What type of roof do you have?
-              </p>
-              <RoofMaterialSelector
-                countryCode={customerCountry}
-                address={customerAddress}
-                selectedId={selectedMaterialId}
-                disabled={savingMaterial}
-                onSelect={(materialId) => void saveRoofMaterial(materialId)}
-              />
-            </div>
-            {materialComplete && hasRoofSqft && settings ? (
-              <div className="mt-4">
-                {materialNotSure ? (
-                  <>
-                    <p className="text-sm text-muted mb-2">Compare materials (full replacement)</p>
-                    <RoofMaterialComparisonTable
-                      countryCode={customerCountry}
-                      address={customerAddress}
-                      roofSqft={roofSqftNumeric}
-                      settings={settings}
-                      formatRange={formatStandardRange}
-                    />
-                  </>
-                ) : (
-                  <RoofMaterialSingleEstimate
-                    low={Number(lead.quote_standard_low) || 0}
-                    high={Number(lead.quote_standard_high) || 0}
-                    formatRange={formatStandardRange}
-                  />
-                )}
-              </div>
-            ) : null}
-            {materialComplete ? (
-              <>
-            <div className="mt-6 space-y-3">
-              <p className="text-sm text-muted leading-relaxed">
-                {gutteringInspectionQuestion(customerCountry)}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={savingGuttering}
-                  onClick={() => void saveGuttering(true, "yes")}
-                  className={gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase}
-                >
-                  Yes please
-                </button>
-                <button
-                  type="button"
-                  disabled={savingGuttering}
-                  onClick={() => void saveGuttering(false, "no")}
-                  className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
-                >
-                  No thanks
-                </button>
-              </div>
-            </div>
-            <div className="mt-6 space-y-3">
-              <p id="job-type-label" className="text-sm text-muted">
-                What best describes your situation?
-              </p>
-              <div className="space-y-2" role="radiogroup" aria-labelledby="job-type-label">
-                {JOB_TYPE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={jobType === opt.value}
-                    onClick={() => setJobType(opt.value)}
-                    className={jobType === opt.value ? slotButtonSelected : slotButtonBase}
-                  >
-                    {opt.emoji} {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mt-6 space-y-4">
-              <div>
-                <label htmlFor="modal-quote-name" className="block text-sm text-muted mb-1.5">
-                  First name
-                </label>
-                <input
-                  id="modal-quote-name"
-                  type="text"
-                  required
-                  autoComplete="given-name"
-                  className={contactFieldClass}
-                  placeholder="First name"
-                  value={contact.name}
-                  onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label htmlFor="modal-quote-email" className="block text-sm text-muted mb-1.5">
-                  Email
-                </label>
-                <input
-                  id="modal-quote-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  className={contactFieldClass}
-                  placeholder="Email"
-                  value={contact.email}
-                  onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label htmlFor="modal-quote-phone" className="block text-sm text-muted mb-1.5">
-                  Phone number
-                </label>
-                <input
-                  id="modal-quote-phone"
-                  type="tel"
-                  required
-                  autoComplete="tel"
-                  className={contactFieldClass}
-                  placeholder="Phone number"
-                  value={contact.phone}
-                  onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                />
-              </div>
-            </div>
-            <label className="mt-4 flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={privacyConsent}
-                onChange={(e) => setPrivacyConsent(e.target.checked)}
-                className="mt-1 h-4 w-4 shrink-0 rounded border-border-subtle bg-background accent-[#F5A623]"
-              />
-              <span className="text-sm text-muted leading-relaxed">
-                I agree to my personal data being processed to generate and deliver my roof quote.{" "}
-                <Link href="/privacy" className="text-accent underline-offset-2 hover:underline">
-                  View our Privacy Policy
-                </Link>
-                .
-              </span>
-            </label>
-            <button
-              type="button"
-              onClick={() => void handleSeeMyQuote()}
-              disabled={!contactReady || savingContact}
-              className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {savingContact ? "Saving…" : "See my quote"}
-            </button>
-              </>
-            ) : (
-              <p className="mt-4 text-sm text-muted">Select your roof type above to continue.</p>
-            )}
-          </div>
-        </div>
-      )}
-
       {showBookingModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none overflow-y-auto"
@@ -710,6 +564,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
+      {hasQuoteEstimates ? (
+        <h1 className="text-2xl md:text-3xl text-foreground mt-6 max-w-[600px]">
+          {detailsUnlocked ? "Your quote" : "Your roof has been analysed"}
+        </h1>
+      ) : null}
+
       {lead?.latitude != null && lead?.longitude != null ? (
         <SatelliteRoofMap
           latitude={Number(lead.latitude)}
@@ -718,7 +578,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           onImageReady={() => setSatelliteReady(true)}
         />
       ) : satelliteSrc ? (
-        <div className="relative w-full max-w-[600px] h-[300px] md:h-[400px] min-h-[300px] overflow-hidden rounded-xl border border-border-subtle bg-[#2A2A2A]">
+        <div className="relative w-full max-w-[600px] h-[300px] md:h-[400px] min-h-[300px] overflow-hidden rounded-xl border border-border-subtle bg-[#2A2A2A] mt-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={satelliteSrc}
@@ -731,10 +591,252 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           />
         </div>
       ) : (
-        <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm">
+        <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm mt-6">
           Satellite image unavailable
         </div>
       )}
+
+      <p className="mt-4 text-sm text-muted max-w-[600px]">
+        Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
+      </p>
+
+      {hasQuoteEstimates && hasRoofSqft ? (
+        <div className="mt-4 grid md:grid-cols-2 gap-3 max-w-[600px]">
+          <p
+            className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
+              !imperialRoofMeasurements ? "md:col-span-2" : ""
+            }`}
+          >
+            Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
+          </p>
+          {imperialRoofMeasurements ? (
+            <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+              Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showGatedFlow ? (
+        <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-teaser-title">
+          <h2 id="quote-teaser-title" className="sr-only">
+            Quote preview
+          </h2>
+          <div className="relative rounded-xl border border-border-subtle bg-surface p-6 overflow-hidden">
+            <p className="text-sm text-muted">Your estimated price range</p>
+            <div className="relative mt-3 min-h-[4.5rem] flex items-center justify-center">
+              <p
+                className="text-2xl text-foreground blur-[14px] select-none pointer-events-none"
+                aria-hidden
+              >
+                {placeholderRange}
+              </p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted">
+                <LockIcon className="text-foreground/70" />
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-center text-muted leading-relaxed">
+              Enter your details to reveal your full quote
+            </p>
+          </div>
+        </section>
+      ) : null}
+
+      {showGatedFlow ? (
+        <section
+          className="mt-8 max-w-[600px] w-full rounded-xl border border-border-subtle bg-surface p-6 md:p-8"
+          aria-labelledby="quote-contact-title"
+        >
+          <h2 id="quote-contact-title" className="text-xl text-foreground">
+            Your details
+          </h2>
+          <p className="mt-2 text-sm text-muted leading-relaxed">
+            Tell us about your roof and how to reach you. We will show your full quote right after.
+          </p>
+          <div className="mt-6 space-y-3">
+            <p id="roof-material-label" className="text-sm text-muted">
+              What type of roof do you have?
+            </p>
+            <RoofMaterialSelector
+              countryCode={customerCountry}
+              address={customerAddress}
+              selectedId={selectedMaterialId}
+              disabled={savingMaterial}
+              onSelect={(materialId) => void saveRoofMaterial(materialId)}
+            />
+          </div>
+          {materialComplete ? (
+            <>
+              <div className="mt-6 space-y-3">
+                <p className="text-sm text-muted leading-relaxed">
+                  {gutteringInspectionQuestion(customerCountry)}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={savingGuttering}
+                    onClick={() => void saveGuttering(true, "yes")}
+                    className={gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase}
+                  >
+                    Yes please
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingGuttering}
+                    onClick={() => void saveGuttering(false, "no")}
+                    className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
+                  >
+                    No thanks
+                  </button>
+                </div>
+              </div>
+              <div className="mt-6 space-y-3">
+                <p id="job-type-label" className="text-sm text-muted">
+                  What best describes your situation?
+                </p>
+                <div className="space-y-2" role="radiogroup" aria-labelledby="job-type-label">
+                  {JOB_TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={jobType === opt.value}
+                      onClick={() => setJobType(opt.value)}
+                      className={jobType === opt.value ? slotButtonSelected : slotButtonBase}
+                    >
+                      {opt.emoji} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
+                    First name
+                  </label>
+                  <input
+                    id="quote-name"
+                    type="text"
+                    required
+                    autoComplete="given-name"
+                    className={contactFieldClass}
+                    placeholder="First name"
+                    value={contact.name}
+                    onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="quote-email" className="block text-sm text-muted mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    id="quote-email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    className={contactFieldClass}
+                    placeholder="Email"
+                    value={contact.email}
+                    onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="quote-phone" className="block text-sm text-muted mb-1.5">
+                    Phone
+                  </label>
+                  <input
+                    id="quote-phone"
+                    type="tel"
+                    required
+                    autoComplete="tel"
+                    className={contactFieldClass}
+                    placeholder="Phone number"
+                    value={contact.phone}
+                    onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <label className="mt-4 flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={privacyConsent}
+                  onChange={(e) => setPrivacyConsent(e.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border-subtle bg-background accent-[#F5A623]"
+                />
+                <span className="text-sm text-muted leading-relaxed">
+                  I agree to my personal data being processed to generate and deliver my roof quote.{" "}
+                  <Link href="/privacy" className="text-accent underline-offset-2 hover:underline">
+                    View our Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => void handleRevealQuote()}
+                disabled={!contactReady || savingContact}
+                className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {savingContact ? "Saving…" : "Reveal my quote"}
+              </button>
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Select your roof type above to continue.</p>
+          )}
+        </section>
+      ) : null}
+
+      {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
+        <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 max-w-[600px]">
+          Your roof has complex features - your final quote may vary significantly from this estimate.
+        </p>
+      )}
+
+      {!hasQuoteEstimates ? (
+        <div className="mt-6 rounded-lg border border-border-subtle bg-surface p-6 text-foreground max-w-[600px]">
+          <p className="text-muted">
+            Cost estimates are not available yet. Analysis may still be in progress or did not complete.
+          </p>
+          {lead.latitude != null && lead.longitude != null && (
+            <Link
+              href={`/analyzing?leadId=${id}&lat=${lead.latitude}&lng=${lead.longitude}&force=true`}
+              className="mt-3 inline-block text-sm text-accent underline"
+            >
+              Re-run roof analysis
+            </Link>
+          )}
+        </div>
+      ) : null}
+
+      {detailsUnlocked && settings && hasRoofSqft ? (
+        <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
+          <h2 id="quote-revealed-title" className="text-lg text-foreground">
+            Your full quote
+          </h2>
+          {materialNotSure ? (
+            <div className="mt-4">
+              <p className="text-sm text-muted mb-3">Compare materials (full replacement)</p>
+              <RoofMaterialComparisonTable
+                countryCode={customerCountry}
+                address={customerAddress}
+                roofSqft={roofSqftNumeric}
+                settings={settings}
+                formatRange={formatStandardRange}
+              />
+            </div>
+          ) : materialComplete ? (
+            <div className="mt-4">
+              <RoofMaterialSingleEstimate
+                low={Number(lead.quote_standard_low) || 0}
+                high={Number(lead.quote_standard_high) || 0}
+                formatRange={formatStandardRange}
+              />
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Select your roof type above to see your personalised estimate.</p>
+          )}
+        </section>
+      ) : null}
 
       {showBookInspectionCta && (
         <section className="mt-6 w-full max-w-[600px]">
@@ -751,95 +853,11 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </section>
       )}
 
-      <p className="mt-4 text-sm text-muted">
-        Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
-      </p>
-
-      <div className="grid md:grid-cols-2 gap-3 mt-4">
-        <p
-          className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
-            !imperialRoofMeasurements ? "md:col-span-2" : ""
-          }`}
-        >
-          Estimated roof area: <strong>{roofAreaDisplay.area}</strong>
+      {hasQuoteEstimates ? (
+        <p className="mt-3 text-sm text-muted max-w-[600px]">
+          Estimate based on AI satellite analysis.
         </p>
-        {imperialRoofMeasurements ? (
-          <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
-            Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
-          </p>
-        ) : null}
-        <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground md:col-span-2">
-          Complexity: <strong>{lead.roof_complexity ?? "—"}</strong>
-        </p>
-      </div>
-
-      {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
-        <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
-          Your roof has complex features - your final quote may vary significantly from this estimate.
-        </p>
-      )}
-
-      {!hasQuoteEstimates ? (
-        <div className="mt-6 rounded-lg border border-border-subtle bg-surface p-6 text-foreground">
-          <p className="text-muted">
-            Cost estimates are not available yet. Analysis may still be in progress or did not complete.
-          </p>
-          {lead.latitude != null && lead.longitude != null && (
-            <Link
-              href={`/analyzing?leadId=${id}&lat=${lead.latitude}&lng=${lead.longitude}&force=true`}
-              className="mt-3 inline-block text-sm text-accent underline"
-            >
-              Re-run roof analysis
-            </Link>
-          )}
-        </div>
-      ) : settings && hasRoofSqft ? (
-        <div className="mt-6 relative">
-          {materialNotSure ? (
-            <div className="relative">
-              <p className="text-sm text-muted mb-3">Compare materials (full replacement)</p>
-              <RoofMaterialComparisonTable
-                countryCode={customerCountry}
-                address={customerAddress}
-                roofSqft={roofSqftNumeric}
-                settings={settings}
-                formatRange={formatStandardRange}
-                blurred={!detailsUnlocked}
-              />
-            </div>
-          ) : materialComplete ? (
-            <div className="relative max-w-md">
-              <RoofMaterialSingleEstimate
-                low={Number(lead.quote_standard_low) || 0}
-                high={Number(lead.quote_standard_high) || 0}
-                formatRange={formatStandardRange}
-                blurred={!detailsUnlocked}
-              />
-            </div>
-          ) : (
-            <div className="rounded-xl border border-border-subtle bg-surface p-6 text-muted text-sm">
-              Select your roof type in the popup to see your personalised estimate.
-            </div>
-          )}
-          {!detailsUnlocked ? (
-            <p className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-medium leading-snug text-foreground pointer-events-none min-h-[120px]">
-              {materialComplete
-                ? "Enter your details to reveal your quote"
-                : "Select your roof type and enter your details to reveal your quote"}
-            </p>
-          ) : null}
-        </div>
       ) : null}
-
-      {hasQuoteEstimates && !detailsUnlocked && (
-        <p className="mt-3 text-sm text-muted leading-relaxed">
-          Select your roof type and enter your details to view your price breakdown.
-        </p>
-      )}
-
-      <p className="mt-3 text-sm text-muted">
-        Estimate based on AI satellite analysis.
-      </p>
 
       {lead.latitude != null && lead.longitude != null && (
         <Link
