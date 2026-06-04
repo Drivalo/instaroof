@@ -61,18 +61,99 @@ function isVisionFailure(error: unknown): error is VisionAnalysisRefusalError | 
 /** Square metres → square feet for internal storage and pricing. */
 const SQFT_PER_SQM = 10.76391041671;
 
+type VisionCountry = "GB" | "AU" | "NZ" | "US_CA" | "DEFAULT";
+
+function normalizeVisionCountry(countryCode: string | null | undefined): VisionCountry {
+  const code = String(countryCode ?? "")
+    .trim()
+    .toUpperCase();
+  if (code === "UK" || code === "GB") return "GB";
+  if (code === "AU" || code === "AUS") return "AU";
+  if (code === "NZ" || code === "NZL") return "NZ";
+  if (code === "US" || code === "CA") return "US_CA";
+  return "DEFAULT";
+}
+
+function countryRoofSizeGuidance(countryCode: string | null | undefined): string {
+  const code = String(countryCode ?? "")
+    .trim()
+    .toUpperCase();
+  if (code === "UK" || code === "GB") {
+    return "A typical UK semi-detached house has a roof area of 50-120 sqm. A detached house is typically 80-200 sqm.";
+  }
+  if (code === "AU" || code === "AUS") {
+    return "A typical Australian suburban home has a roof area of 100-250 sqm.";
+  }
+  if (code === "NZ" || code === "NZL") {
+    return "A typical New Zealand home has a roof area of 80-200 sqm.";
+  }
+  if (code === "US") {
+    return "A typical US single-family home has a roof area of 150-300 sqm (1,600-3,200 sqft).";
+  }
+  if (code === "CA") {
+    return "A typical Canadian single-family home has a roof area of 130-280 sqm.";
+  }
+  return "A typical residential property has a roof area of 80-250 sqm.";
+}
+
+function suspiciousRoofAreaFallbackSqm(country: VisionCountry): number {
+  switch (country) {
+    case "GB":
+      return 100;
+    case "AU":
+    case "NZ":
+      return 150;
+    case "US_CA":
+      return 180;
+    default:
+      return 120;
+  }
+}
+
+function defaultRoofTypeForCountry(country: VisionCountry): RoofType {
+  switch (country) {
+    case "GB":
+      return "tile";
+    case "AU":
+    case "NZ":
+      return "metal";
+    case "US_CA":
+      return "asphalt_shingle";
+    default:
+      return "tile";
+  }
+}
+
+const ROOF_AREA_SQM_SUSPICIOUS_CAP = 500;
+
 const VISION_SYSTEM_PROMPT = `You are the vision module in automated roof measurement software used by licensed roofing contractors to prepare price quotes.
 
 The user message includes one commercial satellite map tile—the same type of public aerial map imagery shown on mainstream mapping websites. The property owner entered their own address into the quoting tool and requested an automated roof area measurement.
 
-Your only job is a construction quantity takeoff: estimate total roof surface area in square metres. Output a single numeric measurement in JSON. No scene description is required.
+Your only job is a construction quantity takeoff: estimate total roof surface area in square metres for ONE house only. Output JSON measurements. No scene description is required.
+
+Measure ONLY the roof of the single residential property at the centre of the image. Ignore neighbouring properties, gardens, roads, driveways, and any other structures.
 
 Human identification is not part of this task. Do not name, count, describe, or infer people, occupants, vehicles, or personal information.`;
 
-const VISION_USER_PROMPT = `Estimate the total roof surface area in square metres from this map tile.
+function buildVisionUserPrompt(countryCode: string | null | undefined): string {
+  const country = normalizeVisionCountry(countryCode);
+  const guidance = countryRoofSizeGuidance(countryCode);
+  return `Estimate the total roof surface area in square metres from this map tile.
+
+CRITICAL: Measure ONLY the roof of the single residential property at the centre of the image. Do not include neighbouring roofs, the full building footprint on multiple lots, gardens, roads, or the entire satellite tile.
+
+Regional context (${country}): ${guidance}
+
+If your estimate exceeds 400 sqm for a single residential property, you are likely measuring too large an area. Remeasure focusing only on the central property's roof.
+
+Also infer the visible roof material type and your confidence (0-100) in that inference.
 
 Return JSON only, with this exact shape:
-{"roof_area_sqm": <positive integer>}`;
+{"roof_area_sqm": <positive integer>, "roof_type": "<material id>", "confidence": <integer 0-100>}
+
+Use one of these roof_type values: asphalt_shingle, concrete_tile, colorbond, metal, tile, flat, slate.`;
+}
 
 /** Placeholder overlay for the quote UI — not requested from the model (reduces refusals). */
 function displayPolygonPlaceholder() {
@@ -202,37 +283,179 @@ function extractJsonObject(text: string): Record<string, unknown> {
   return JSON.parse(candidate.slice(start, end + 1)) as Record<string, unknown>;
 }
 
-function parseRoofSqftFromModel(raw: Record<string, unknown>): { roofSqft: number; roofAreaSqm: number | null } {
-  const sqm = Number(raw.roof_area_sqm);
-  if (Number.isFinite(sqm) && sqm > 0) {
-    return { roofAreaSqm: Math.round(sqm), roofSqft: Math.max(500, Math.round(sqm * SQFT_PER_SQM)) };
-  }
+const METRIC_DISPLAY_SQFT_TO_SQM = 0.092903;
 
-  const sqft = Number(raw.roof_sqft);
-  if (Number.isFinite(sqft) && sqft > 0) {
-    return { roofAreaSqm: null, roofSqft: Math.max(500, Math.round(sqft)) };
-  }
-
-  return { roofAreaSqm: null, roofSqft: 0 };
+function logRoofAreaConversionTrace(args: {
+  sourceField: string;
+  rawAiPayload: Record<string, unknown>;
+  aiRoofAreaSqm: number | null;
+  aiRoofSqftField: number | null;
+  storedRoofSqft: number;
+  interpretationNote: string;
+}) {
+  const displaySqmFromStored = Math.round(args.storedRoofSqft * METRIC_DISPLAY_SQFT_TO_SQM);
+  console.info(`${LOG_PREFIX} Roof area calculation trace`, {
+    measurement_target: "roof_surface_area (prompt asks AI for sqm, not whole plot)",
+    source_field_used: args.sourceField,
+    raw_ai_json: args.rawAiPayload,
+    ai_roof_area_sqm: args.aiRoofAreaSqm,
+    ai_roof_sqft_field: args.aiRoofSqftField,
+    interpretation: args.interpretationNote,
+    sqft_per_sqm_multiplier: SQFT_PER_SQM,
+    stored_roof_sqft_internal: args.storedRoofSqft,
+    customer_display_if_metric_market: `${displaySqmFromStored} m² (roof_sqft * ${METRIC_DISPLAY_SQFT_TO_SQM})`,
+    customer_display_if_imperial_market: `${args.storedRoofSqft} sq ft (stored value as-is)`,
+    unit_mismatch_hint:
+      args.aiRoofAreaSqm != null && args.aiRoofAreaSqm > 400
+        ? "AI sqm is high for a typical home; model may be measuring building footprint, full map tile, or returning sq ft in roof_area_sqm"
+        : null,
+  });
 }
 
-function normalizeVisionAnalysis(raw: Record<string, unknown>): VisionAnalysis {
-  const { roofSqft, roofAreaSqm } = parseRoofSqftFromModel(raw);
+function parseRoofSqftFromModel(
+  raw: Record<string, unknown>,
+  countryCode: string | null | undefined,
+): { roofSqft: number; roofAreaSqm: number | null; areaCappedAsSuspicious: boolean } {
+  const country = normalizeVisionCountry(countryCode);
+  const rawSqm = raw.roof_area_sqm;
+  const rawSqft = raw.roof_sqft;
+  console.info(`${LOG_PREFIX} parseRoofSqftFromModel raw AI fields`, {
+    roof_area_sqm: rawSqm,
+    roof_sqft: rawSqft,
+    json_keys: Object.keys(raw),
+    country,
+  });
+
+  const sqm = Number(rawSqm);
+  if (Number.isFinite(sqm) && sqm > 0) {
+    let roofAreaSqm = Math.round(sqm);
+    let areaCappedAsSuspicious = false;
+    if (roofAreaSqm > ROOF_AREA_SQM_SUSPICIOUS_CAP) {
+      const fallbackSqm = suspiciousRoofAreaFallbackSqm(country);
+      console.warn(`${LOG_PREFIX} roof_area_sqm exceeds ${ROOF_AREA_SQM_SUSPICIOUS_CAP} — suspicious, using country fallback`, {
+        ai_roof_area_sqm: roofAreaSqm,
+        fallback_sqm: fallbackSqm,
+        country,
+      });
+      roofAreaSqm = fallbackSqm;
+      areaCappedAsSuspicious = true;
+    }
+    const roofSqft = Math.max(500, Math.round(roofAreaSqm * SQFT_PER_SQM));
+    logRoofAreaConversionTrace({
+      sourceField: areaCappedAsSuspicious ? "roof_area_sqm (capped fallback)" : "roof_area_sqm",
+      rawAiPayload: raw,
+      aiRoofAreaSqm: roofAreaSqm,
+      aiRoofSqftField: Number.isFinite(Number(rawSqft)) ? Number(rawSqft) : null,
+      storedRoofSqft: roofSqft,
+      interpretationNote: areaCappedAsSuspicious
+        ? `AI sqm exceeded ${ROOF_AREA_SQM_SUSPICIOUS_CAP}; replaced with country fallback ${roofAreaSqm} sqm then converted to sqft`
+        : `Treated roof_area_sqm as square metres; converted to internal sqft via sqm * ${SQFT_PER_SQM}`,
+    });
+    return { roofAreaSqm, roofSqft, areaCappedAsSuspicious };
+  }
+
+  const sqft = Number(rawSqft);
+  if (Number.isFinite(sqft) && sqft > 0) {
+    const roofSqft = Math.max(500, Math.round(sqft));
+    logRoofAreaConversionTrace({
+      sourceField: "roof_sqft",
+      rawAiPayload: raw,
+      aiRoofAreaSqm: null,
+      aiRoofSqftField: roofSqft,
+      storedRoofSqft: roofSqft,
+      interpretationNote: "Used legacy roof_sqft field as square feet with no sqm conversion",
+    });
+    return { roofAreaSqm: null, roofSqft, areaCappedAsSuspicious: false };
+  }
+
+  console.warn(`${LOG_PREFIX} parseRoofSqftFromModel no valid area in AI JSON`, { raw });
+  return { roofAreaSqm: null, roofSqft: 0, areaCappedAsSuspicious: false };
+}
+
+function mapModelRoofTypeToRoofType(value: unknown): RoofType | null {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (!normalized) return null;
+  if (["asphalt_shingle", "asphalt_shingles", "shingle", "shingles"].includes(normalized)) {
+    return "asphalt_shingle";
+  }
+  if (["colorbond", "zincalume", "metal", "steel"].includes(normalized)) return "metal";
+  if (
+    [
+      "concrete_tile",
+      "concrete_tiles",
+      "tile",
+      "tiles",
+      "terracotta",
+      "terracotta_tiles",
+      "clay",
+      "clay_terracotta",
+      "slate",
+    ].includes(normalized)
+  ) {
+    return "tile";
+  }
+  if (["flat", "felt_flat", "felt"].includes(normalized)) return "flat";
+  return null;
+}
+
+function resolveRoofType(
+  raw: Record<string, unknown>,
+  countryCode: string | null | undefined,
+): { roof_type: RoofType; confidence: number } {
+  const country = normalizeVisionCountry(countryCode);
+  const defaultType = defaultRoofTypeForCountry(country);
+  const rawConfidence = Number(raw.confidence);
+  const confidence = Number.isFinite(rawConfidence)
+    ? Math.min(100, Math.max(0, Math.round(rawConfidence)))
+    : 0;
+  const parsedType = mapModelRoofTypeToRoofType(raw.roof_type);
+
+  if (confidence < 80) {
+    console.info(`${LOG_PREFIX} roof_type confidence below 80 — using country default`, {
+      confidence,
+      parsedType,
+      defaultType,
+      country,
+    });
+    return { roof_type: defaultType, confidence: confidence > 0 ? confidence : 75 };
+  }
+
+  if (parsedType) {
+    return { roof_type: parsedType, confidence };
+  }
+
+  console.info(`${LOG_PREFIX} roof_type not recognized in AI JSON — using country default`, {
+    raw_roof_type: raw.roof_type,
+    defaultType,
+    country,
+  });
+  return { roof_type: defaultType, confidence: confidence > 0 ? confidence : 75 };
+}
+
+function normalizeVisionAnalysis(
+  raw: Record<string, unknown>,
+  countryCode: string | null | undefined,
+): VisionAnalysis {
+  const { roofSqft, roofAreaSqm, areaCappedAsSuspicious } = parseRoofSqftFromModel(raw, countryCode);
   const roof_sqft = roofSqft > 0 ? roofSqft : 500;
+  const { roof_type, confidence } = resolveRoofType(raw, countryCode);
+  const complexity: RoofComplexity = "moderate";
 
   console.info(`${LOG_PREFIX} Normalized vision result:`, {
     raw_roof_area_sqm: raw.roof_area_sqm,
     parsed_roof_area_sqm: roofAreaSqm,
+    area_capped_as_suspicious: areaCappedAsSuspicious,
     final_roof_sqft: roof_sqft,
+    roof_type,
+    confidence,
   });
 
   if (roofSqft <= 0) {
     console.warn(`${LOG_PREFIX} Model returned invalid roof_area_sqm; using minimum 500 sq ft`);
   }
-
-  const roof_type: RoofType = "asphalt_shingle";
-  const complexity: RoofComplexity = "moderate";
-  const confidence = 75;
 
   return {
     roof_sqft,
@@ -243,7 +466,10 @@ function normalizeVisionAnalysis(raw: Record<string, unknown>): VisionAnalysis {
   };
 }
 
-async function runVisionAnalysisInner(imageUrl: string): Promise<VisionAnalysis> {
+async function runVisionAnalysisInner(
+  imageUrl: string,
+  countryCode: string | null | undefined,
+): Promise<VisionAnalysis> {
   console.info(`${LOG_PREFIX} runVisionAnalysisInner start`);
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
@@ -257,6 +483,9 @@ async function runVisionAnalysisInner(imageUrl: string): Promise<VisionAnalysis>
     satelliteUrl: maskGoogleMapsKeyInUrl(imageUrl),
     encodedPayloadKb: encodedKb,
     zoom: SATELLITE_STATIC_ZOOM,
+    satellite_tile_pixels: "600x600 at scale 2 (1200px effective)",
+    satellite_tile_note:
+      "At zoom 19 the image can cover a few hundred metres across; AI may over-estimate if it measures the full tile or footprint instead of roof surface only",
   });
 
   console.info(`${LOG_PREFIX} Calling OpenAI gpt-4o chat/completions…`);
@@ -272,13 +501,13 @@ async function runVisionAnalysisInner(imageUrl: string): Promise<VisionAnalysis>
         model: "gpt-4o",
         response_format: { type: "json_object" },
         temperature: 0.1,
-        max_tokens: 64,
+        max_tokens: 128,
         messages: [
           { role: "system", content: VISION_SYSTEM_PROMPT },
           {
             role: "user",
             content: [
-              { type: "text", text: VISION_USER_PROMPT },
+              { type: "text", text: buildVisionUserPrompt(countryCode) },
               {
                 type: "image_url",
                 image_url: { url: imageDataUrl, detail: "low" },
@@ -336,22 +565,32 @@ async function runVisionAnalysisInner(imageUrl: string): Promise<VisionAnalysis>
     throw parseError;
   }
 
-  const normalized = normalizeVisionAnalysis(parsed);
+  const normalized = normalizeVisionAnalysis(parsed, countryCode);
   console.info(`${LOG_PREFIX} GPT-4o analysis complete — source: openai`, {
     roof_sqft: normalized.roof_sqft,
+    roof_type: normalized.roof_type,
+    confidence: normalized.confidence,
+    country_code: countryCode,
     used_hardcoded_fallback: false,
   });
   return normalized;
 }
 
-export async function runVisionAnalysis(imageUrl: string): Promise<VisionAnalysis> {
+export async function runVisionAnalysis(
+  imageUrl: string,
+  countryCode?: string | null,
+): Promise<VisionAnalysis> {
   ensureEnvLoaded();
   const timeoutMs = VISION_ANALYSIS_TIMEOUT_MS;
-  console.info(`${LOG_PREFIX} runVisionAnalysis start`, { timeoutMs, imageUrl: imageUrl.replace(/key=[^&]+/, "key=***") });
+  console.info(`${LOG_PREFIX} runVisionAnalysis start`, {
+    timeoutMs,
+    country_code: countryCode,
+    imageUrl: imageUrl.replace(/key=[^&]+/, "key=***"),
+  });
 
   try {
     const result = await Promise.race([
-      runVisionAnalysisInner(imageUrl),
+      runVisionAnalysisInner(imageUrl, countryCode),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new VisionAnalysisTimeoutError()), timeoutMs);
       }),

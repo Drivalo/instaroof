@@ -8,6 +8,7 @@ import {
   SATELLITE_STATIC_ZOOM,
   satelliteImageSrcForLead,
 } from "@/lib/maps-static";
+import { formatRoofAreaDisplay } from "@/lib/roof-estimate";
 import { calcQuoteRanges } from "@/lib/quote";
 import { getSettings, getSupabaseAdmin } from "@/lib/supabase";
 import {
@@ -88,19 +89,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const staticUrlForVision = mapsStaticSatelliteUrl(lead.latitude, lead.longitude, mapsKey);
+    const lat = Number(lead.latitude);
+    const metersPerPixelApprox =
+      Number.isFinite(lat) && Math.abs(lat) <= 85
+        ? (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, SATELLITE_STATIC_ZOOM) / 2
+        : null;
+    const tileSpanMetresApprox =
+      metersPerPixelApprox != null ? Math.round(metersPerPixelApprox * 1200) : null;
+
     console.info(`[vision/analyze] lead ${leadId} starting analysis`, {
       address: lead.address,
       latitude: lead.latitude,
       longitude: lead.longitude,
+      country_code: lead.country_code,
       force,
       satelliteZoom: SATELLITE_STATIC_ZOOM,
       satelliteUrl: maskGoogleMapsKeyInUrl(staticUrlForVision),
+      satellite_tile_span_metres_approx: tileSpanMetresApprox,
+      satellite_context_note:
+        "Approximate ground span of the static map tile; compare to AI roof_area_sqm to spot footprint/tile-scale errors",
     });
     let analysis: VisionAnalysis;
     let analysisSource = "gpt4o_vision";
 
     try {
-      analysis = await runVisionAnalysis(staticUrlForVision);
+      analysis = await runVisionAnalysis(staticUrlForVision, lead.country_code);
     } catch (visionError) {
       const fallbackRegion = detectCoordinateFallbackRegion(
         lead.latitude,
@@ -146,11 +159,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
+    const areaDisplay = formatRoofAreaDisplay(
+      analysis.roof_sqft,
+      lead.address,
+      lead.country_code,
+    );
+    const fallbackSqm =
+      "roof_area_sqm" in analysis && typeof (analysis as { roof_area_sqm?: number }).roof_area_sqm === "number"
+        ? (analysis as { roof_area_sqm: number }).roof_area_sqm
+        : null;
+
     console.info(`[vision/analyze] lead ${leadId} analysis done`, {
       source: analysisSource,
-      roof_sqft: analysis.roof_sqft,
+      roof_sqft_stored_internal: analysis.roof_sqft,
+      roof_area_sqm_from_fallback_or_uk: fallbackSqm,
       roof_type: analysis.roof_type,
       confidence: analysis.confidence,
+      customer_display_label: areaDisplay.label,
+      customer_display_unit: areaDisplay.unit,
+      storage_note: "leads.roof_sqft is always square feet; metric UI converts with * 0.092903",
+    });
+    console.info(`[vision/analyze] lead ${leadId} raw vision payload (pre-save)`, {
+      analysis,
     });
     const quotes = calcQuoteRanges(analysis.roof_sqft, analysis.roof_type, settings);
 
