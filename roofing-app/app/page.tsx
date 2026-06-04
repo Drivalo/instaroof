@@ -281,8 +281,12 @@ export default function Home() {
                 </div>
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Price range</p>
+                  <p className="mt-1 text-xs text-muted">Quick estimate based on your postcode</p>
                   <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
+                  </p>
+                  <p className="mt-2 text-xs text-muted leading-relaxed">
+                    This will be refined once we analyse your roof via satellite imagery.
                   </p>
                 </div>
               </div>
