@@ -211,7 +211,7 @@ function buildHtml(
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background-color:#2a2a2a;border:1px solid #3a3a3a;border-radius:12px;">
           <tr>
             <td style="padding:32px 28px;">
-              <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">Nimly</p>
+              <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">${companyName}</p>
               <h1 style="margin:0 0 20px;font-size:22px;font-weight:500;color:#ffffff;line-height:1.3;">${headline}</h1>
               <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#a0a0a0;">
                 ${intro}

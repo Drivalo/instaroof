@@ -1,7 +1,7 @@
 import { SettingsRow } from "@/lib/types";
 
 export const DEFAULT_SETTINGS: Omit<SettingsRow, "id"> = {
-  company_name: "Nimly",
+  company_name: "Your Roofing Company",
   company_phone: "(555) 123-4567",
   company_email: "hello@nimly.tech",
   company_logo_url: null,
@@ -35,5 +35,5 @@ export const DEFAULT_SETTINGS: Omit<SettingsRow, "id"> = {
     "Your inspection is confirmed for {{inspection_date}} at {{inspection_time}}.",
   email_template_inspection_reminder:
     "Reminder: your inspection is tomorrow at {{inspection_time}}.",
-  owner_name: "Nimly Team",
+  owner_name: "Your Team",
 };

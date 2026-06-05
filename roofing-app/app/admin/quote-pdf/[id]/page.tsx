@@ -110,7 +110,7 @@ export default async function AdminQuotePdfPage({
     notFound();
   }
 
-  const companyName = process.env.NEXT_PUBLIC_COMPANY_NAME?.trim() || "InstaRoof";
+  const companyName = settings.company_name?.trim() || "Your Roofing Company";
   const address = String(lead.address ?? "").trim() || "—";
   const countryCode = lead.country_code != null ? String(lead.country_code) : null;
   const hasStandardQuote =

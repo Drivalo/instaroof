@@ -147,7 +147,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
         ? "<p style=\"color:#6b6b6b;font-size:14px;\">Satellite analysis has finished and quote ranges are updated.</p>"
         : context === "contact_updated"
           ? "<p style=\"color:#6b6b6b;font-size:14px;\">The customer added or updated their contact details on the quote page.</p>"
-          : "<p style=\"color:#6b6b6b;font-size:14px;\">A new property was submitted through Nimly.</p>";
+          : `<p style="color:#6b6b6b;font-size:14px;">A new property was submitted through ${settings.company_name || "Your Roofing Company"}.</p>`;
 
   const appointmentRows = appointment
     ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Inspection date</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${appointment.date}</td></tr>

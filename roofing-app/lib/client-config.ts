@@ -3,8 +3,8 @@
  * For now, a single hardcoded test client.
  */
 export const CLIENT_CONFIG = {
-  clientId: "nimly-demo",
-  companyName: "Nimly",
+  clientId: "instaroof-demo",
+  companyName: "Your Roofing Company",
   /** Recipient for new-lead notification emails (Resend). */
   notificationEmail: "hello@nimly.tech",
 } as const;

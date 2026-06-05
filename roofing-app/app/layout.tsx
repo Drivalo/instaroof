@@ -17,8 +17,8 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
-  title: "Nimly",
-  description: "Nimly — AI-powered instant roofing quotes and booking",
+  title: "Instant Roof Quote",
+  description: "AI-powered instant roofing quotes and booking",
 };
 
 export default function RootLayout({
