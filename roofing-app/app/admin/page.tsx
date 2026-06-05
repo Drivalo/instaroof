@@ -60,6 +60,10 @@ function displayValue(value: string | null | undefined): string {
   return trimmed || "—";
 }
 
+function formatLeadReference(id: number): string {
+  return `IR-${String(id).padStart(4, "0")}`;
+}
+
 function formatSubmittedAt(iso: string): string {
   try {
     return format(new Date(iso), "MMM d, yyyy");
@@ -363,6 +367,7 @@ export default function AdminPage() {
           <table className="min-w-[1300px] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border-subtle text-muted">
+                <th className="px-4 py-3 font-normal whitespace-nowrap">Ref</th>
                 <th className="px-4 py-3 font-normal whitespace-nowrap">Date</th>
                 <th className="px-4 py-3 font-normal">Name</th>
                 <th className="px-4 py-3 font-normal whitespace-nowrap">Phone</th>
@@ -378,7 +383,7 @@ export default function AdminPage() {
             <tbody>
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-muted">
+                  <td colSpan={11} className="px-4 py-10 text-center text-muted">
                     <p className="text-foreground font-medium">
                       {leads.length === 0 ? "No leads yet" : "No leads match your filters"}
                     </p>
@@ -408,6 +413,9 @@ export default function AdminPage() {
                               : ""
                         }`}
                       >
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                          {formatLeadReference(lead.id)}
+                        </td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">
                           {formatSubmittedAt(lead.created_at)}
                         </td>
@@ -484,7 +492,7 @@ export default function AdminPage() {
                       </tr>
                       {expanded ? (
                         <tr key={`${lead.id}-detail`} className="border-b border-border-subtle bg-background/50">
-                          <td colSpan={10} className="px-4 py-4">
+                          <td colSpan={11} className="px-4 py-4">
                             <LeadDetailPanel lead={lead} />
                           </td>
                         </tr>
@@ -507,7 +515,7 @@ export default function AdminPage() {
 function LeadDetailPanel({ lead }: { lead: AdminLead }) {
   const urgent = isEmergencyJobType(lead.job_type);
   const rows: Array<{ label: string; value: string }> = [
-    { label: "Lead ID", value: String(lead.id) },
+    { label: "Reference", value: formatLeadReference(lead.id) },
     { label: "Submitted", value: formatSubmittedAtDetail(lead.created_at) },
     { label: "Name", value: displayValue(lead.name) },
     { label: "Phone", value: displayValue(lead.phone) },
