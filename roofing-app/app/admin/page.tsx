@@ -85,6 +85,7 @@ export default function AdminPage() {
   const [leads, setLeads] = useState<AdminLead[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [jobTypeFilter, setJobTypeFilter] = useState<JobTypeFilter>("all");
+  const [hasContactInfoOnly, setHasContactInfoOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<number, string>>({});
@@ -133,6 +134,9 @@ export default function AdminPage() {
       if (jobTypeFilter !== "all" && lead.job_type !== jobTypeFilter) {
         return false;
       }
+      if (hasContactInfoOnly && !lead.name?.trim()) {
+        return false;
+      }
       if (q) {
         const name = (lead.name ?? "").toLowerCase();
         const address = lead.address.toLowerCase();
@@ -140,7 +144,7 @@ export default function AdminPage() {
       }
       return true;
     });
-  }, [leads, statusFilter, jobTypeFilter, searchQuery]);
+  }, [leads, statusFilter, jobTypeFilter, hasContactInfoOnly, searchQuery]);
 
   async function patchLead(
     leadId: number,
@@ -259,7 +263,10 @@ export default function AdminPage() {
             <p className="mt-1 text-sm text-muted">
               <span className="text-foreground font-medium">{filteredLeads.length}</span>
               {filteredLeads.length === 1 ? " lead" : " leads"}
-              {statusFilter !== "all" || jobTypeFilter !== "all" || searchQuery.trim()
+              {statusFilter !== "all" ||
+              jobTypeFilter !== "all" ||
+              hasContactInfoOnly ||
+              searchQuery.trim()
                 ? " matching filters"
                 : " total"}
             </p>
@@ -334,6 +341,21 @@ export default function AdminPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="pb-2">
+            <label
+              htmlFor="admin-contact-filter"
+              className="flex items-center gap-2 text-sm text-foreground cursor-pointer whitespace-nowrap"
+            >
+              <input
+                id="admin-contact-filter"
+                type="checkbox"
+                checked={hasContactInfoOnly}
+                onChange={(e) => setHasContactInfoOnly(e.target.checked)}
+                className="h-4 w-4 rounded border-border-subtle bg-background accent-[#F5A623]"
+              />
+              Has contact info only
+            </label>
           </div>
         </div>
 
