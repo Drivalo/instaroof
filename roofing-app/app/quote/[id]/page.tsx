@@ -9,7 +9,8 @@ import {
   RoofMaterialSelector,
   RoofMaterialSingleEstimate,
 } from "@/components/roof-material-panel";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { gutteringInspectionQuestion } from "@/lib/guttering-inspection";
 import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
 import { isRoofMaterialNotSure } from "@/lib/roof-material";
@@ -186,7 +187,9 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
-export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
+function QuotePageContent({ params }: { params: Promise<{ id: string }> }) {
+  const searchParams = useSearchParams();
+  const addressIssue = searchParams.get("addressIssue") === "true";
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
   const [settings, setSettings] = useState<SettingsRow | null>(null);
@@ -494,9 +497,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     if (!satelliteSrc) setSatelliteReady(true);
   }, [satelliteSrc]);
 
-  const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
-  const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
+  const showBookingModal =
+    !addressIssue && bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
+  const showBookInspectionCta =
+    !addressIssue && detailsUnlocked && hasQuoteEstimates && !showBookingModal;
   const showGatedFlow = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
+  const showContactSection = addressIssue ? !detailsUnlocked : showGatedFlow;
   const placeholderRange = placeholderQuoteRangeLabel(customerAddress, customerCountry);
 
   useEffect(() => {
@@ -564,20 +570,20 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {hasQuoteEstimates ? (
+      {!addressIssue && hasQuoteEstimates ? (
         <h1 className="text-2xl md:text-3xl text-foreground mt-6 max-w-[600px]">
           {detailsUnlocked ? "Your quote" : "Your roof has been analysed"}
         </h1>
       ) : null}
 
-      {lead?.latitude != null && lead?.longitude != null ? (
+      {!addressIssue && lead?.latitude != null && lead?.longitude != null ? (
         <SatelliteRoofMap
           latitude={Number(lead.latitude)}
           longitude={Number(lead.longitude)}
           fallbackSrc={satelliteSrc || undefined}
           onImageReady={() => setSatelliteReady(true)}
         />
-      ) : satelliteSrc ? (
+      ) : !addressIssue && satelliteSrc ? (
         <div className="relative w-full max-w-[600px] h-[300px] md:h-[400px] min-h-[300px] overflow-hidden rounded-xl border border-border-subtle bg-[#2A2A2A] mt-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -590,17 +596,19 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             onError={() => setSatelliteReady(true)}
           />
         </div>
-      ) : (
+      ) : !addressIssue ? (
         <div className="flex h-[300px] md:h-[400px] max-w-[600px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-muted text-sm mt-6">
           Satellite image unavailable
         </div>
-      )}
+      ) : null}
 
-      <p className="mt-4 text-sm text-muted max-w-[600px]">
-        Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
-      </p>
+      {!addressIssue ? (
+        <p className="mt-4 text-sm text-muted max-w-[600px]">
+          Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
+        </p>
+      ) : null}
 
-      {hasQuoteEstimates && hasRoofSqft && lead?.vision_roof_visible !== false ? (
+      {!addressIssue && hasQuoteEstimates && hasRoofSqft && lead?.vision_roof_visible !== false ? (
         <div className="mt-4 grid md:grid-cols-2 gap-3 max-w-[600px]">
           <p
             className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
@@ -617,7 +625,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
-      {lead?.vision_roof_visible === false ? (
+      {addressIssue ? (
+        <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 max-w-[600px] leading-relaxed">
+          <p className="font-medium">We couldn&apos;t confirm your property</p>
+          <p className="mt-2">
+            No problem — fill in your details below and we&apos;ll get in touch to arrange a free
+            inspection.
+          </p>
+        </div>
+      ) : lead?.vision_roof_visible === false ? (
         <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 max-w-[600px] leading-relaxed">
           <p className="font-medium">We couldn&apos;t get a clear satellite view of this property</p>
           {lead.vision_fallback_reason?.trim() ? (
@@ -627,7 +643,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
-      {showGatedFlow && lead?.vision_roof_visible !== false ? (
+      {!addressIssue && showGatedFlow && lead?.vision_roof_visible !== false ? (
         <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-teaser-title">
           <h2 id="quote-teaser-title" className="sr-only">
             Quote preview
@@ -652,7 +668,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </section>
       ) : null}
 
-      {showGatedFlow ? (
+      {showContactSection ? (
         <section
           className="mt-8 max-w-[600px] w-full rounded-xl border border-border-subtle bg-surface p-6 md:p-8"
           aria-labelledby="quote-contact-title"
@@ -796,13 +812,13 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </section>
       ) : null}
 
-      {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
+      {!addressIssue && lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
         <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 max-w-[600px]">
           Your roof has complex features - your final quote may vary significantly from this estimate.
         </p>
       )}
 
-      {!hasQuoteEstimates ? (
+      {!addressIssue && !hasQuoteEstimates ? (
         <div className="mt-6 rounded-lg border border-border-subtle bg-surface p-6 text-foreground max-w-[600px]">
           <p className="text-muted">
             Cost estimates are not available yet. Analysis may still be in progress or did not complete.
@@ -818,7 +834,11 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
-      {detailsUnlocked && lead?.vision_roof_visible !== false && settings && hasRoofSqft ? (
+      {!addressIssue &&
+      detailsUnlocked &&
+      lead?.vision_roof_visible !== false &&
+      settings &&
+      hasRoofSqft ? (
         <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
           <h2 id="quote-revealed-title" className="text-lg text-foreground">
             Your full quote
@@ -863,13 +883,13 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </section>
       )}
 
-      {hasQuoteEstimates ? (
+      {!addressIssue && hasQuoteEstimates ? (
         <p className="mt-3 text-sm text-muted max-w-[600px]">
           Estimate based on AI satellite analysis.
         </p>
       ) : null}
 
-      {lead.latitude != null && lead.longitude != null && (
+      {!addressIssue && lead.latitude != null && lead.longitude != null && (
         <Link
           href={`/analyzing?leadId=${id}&lat=${lead.latitude}&lng=${lead.longitude}&force=true`}
           className="mt-3 inline-block text-sm text-[#C8102E] underline"
@@ -879,5 +899,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       )}
 
     </main>
+  );
+}
+
+export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense
+      fallback={<main className="customer-page container-max py-10">Loading quote...</main>}
+    >
+      <QuotePageContent params={params} />
+    </Suspense>
   );
 }

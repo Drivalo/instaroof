@@ -32,6 +32,8 @@ function AnalyzingContent() {
   const [imageError, setImageError] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(true);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
   const runIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -120,11 +122,15 @@ function AnalyzingContent() {
         }
 
         if (data.cached && data.lead?.roof_sqft != null) {
-          router.push(`/quote/${id}`);
+          setAnalysisId(id);
+          setAwaitingConfirmation(true);
+          setAnalyzing(false);
           return;
         }
 
-        router.push(`/quote/${id}`);
+        setAnalysisId(id);
+        setAwaitingConfirmation(true);
+        setAnalyzing(false);
       } catch (error) {
         if (runId !== runIdRef.current) return;
 
@@ -144,6 +150,8 @@ function AnalyzingContent() {
   const handleRetry = useCallback(() => {
     if (!leadId) return;
     setAnalyzing(true);
+    setAwaitingConfirmation(false);
+    setAnalysisId(null);
     setAnalysisError(null);
     setIndex(0);
     setImageError(false);
@@ -239,22 +247,48 @@ function AnalyzingContent() {
                 Loading satellite imagery...
               </div>
             )}
+            {awaitingConfirmation && analysisId ? (
+              <div className="mt-4 rounded-xl border border-border-subtle bg-surface p-6">
+                <h2 className="text-xl text-foreground">Does this look like your property?</h2>
+                <p className="mt-2 text-sm text-muted leading-relaxed">
+                  We&apos;ll use this satellite view to estimate your roof size.
+                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/quote/${analysisId}`)}
+                    className="rounded-xl bg-[#C8102E] px-6 py-3 text-white hover:opacity-90"
+                  >
+                    Yes, that&apos;s my property
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/quote/${analysisId}?addressIssue=true`)}
+                    className="rounded-xl border border-border-subtle bg-background px-6 py-3 text-foreground hover:border-accent transition-colors"
+                  >
+                    No, wrong property
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
-          <ul className="mt-6 space-y-2">
-            {steps.map((step, i) => (
-              <li
-                key={step}
-                className={`rounded-lg p-3 ${
-                  i <= index
-                    ? "bg-[#C9A96E] text-[#1C1C1C]"
-                    : "bg-surface text-muted border border-border-subtle"
-                }`}
-              >
-                {i <= index ? "✓ " : ""}
-                {step}
-              </li>
-            ))}
-          </ul>
+          {!awaitingConfirmation ? (
+            <ul className="mt-6 space-y-2">
+              {steps.map((step, i) => (
+                <li
+                  key={step}
+                  className={`rounded-lg p-3 ${
+                    i <= index
+                      ? "bg-[#C9A96E] text-[#1C1C1C]"
+                      : "bg-surface text-muted border border-border-subtle"
+                  }`}
+                >
+                  {i <= index ? "✓ " : ""}
+                  {step}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </>
       )}
     </main>
