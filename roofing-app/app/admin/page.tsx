@@ -379,7 +379,14 @@ export default function AdminPage() {
               {filteredLeads.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-4 py-10 text-center text-muted">
-                    No leads match your filters.
+                    <p className="text-foreground font-medium">
+                      {leads.length === 0 ? "No leads yet" : "No leads match your filters"}
+                    </p>
+                    <p className="mt-1 text-sm">
+                      {leads.length === 0
+                        ? "Share your quote link to start receiving enquiries."
+                        : "Try adjusting your search or filter criteria."}
+                    </p>
                   </td>
                 </tr>
               ) : (
