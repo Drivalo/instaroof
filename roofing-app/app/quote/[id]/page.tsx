@@ -600,7 +600,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
       </p>
 
-      {hasQuoteEstimates && hasRoofSqft ? (
+      {hasQuoteEstimates && hasRoofSqft && lead?.vision_roof_visible !== false ? (
         <div className="mt-4 grid md:grid-cols-2 gap-3 max-w-[600px]">
           <p
             className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
@@ -618,11 +618,13 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       ) : null}
 
       {lead?.vision_roof_visible === false ? (
-        <p className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 max-w-[600px] leading-relaxed">
-          {lead.vision_fallback_reason?.trim()
-            ? lead.vision_fallback_reason
-            : "We could not clearly identify a roof in the satellite image for this property."}
-        </p>
+        <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 max-w-[600px] leading-relaxed">
+          <p className="font-medium">We couldn&apos;t get a clear satellite view of this property</p>
+          {lead.vision_fallback_reason?.trim() ? (
+            <p className="mt-2">{lead.vision_fallback_reason}</p>
+          ) : null}
+          <p className="mt-2">Fill in your details below and we&apos;ll prepare your quote manually.</p>
+        </div>
       ) : null}
 
       {showGatedFlow && lead?.vision_roof_visible !== false ? (
