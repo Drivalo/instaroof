@@ -496,7 +496,9 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted">Click a row to expand full lead details.</p>
+        {filteredLeads.length > 0 ? (
+          <p className="text-xs text-muted">Click a row to expand full lead details.</p>
+        ) : null}
       </div>
     </main>
   );
