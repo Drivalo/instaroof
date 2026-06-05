@@ -623,7 +623,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           {lead.vision_fallback_reason?.trim() ? (
             <p className="mt-2">{lead.vision_fallback_reason}</p>
           ) : null}
-          <p className="mt-2">Fill in your details below and we&apos;ll prepare your quote manually.</p>
+          <p className="mt-2">Fill in your details below and we&apos;ll get in touch to book a free inspection.</p>
         </div>
       ) : null}
 
