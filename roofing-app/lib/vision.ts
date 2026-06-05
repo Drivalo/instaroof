@@ -149,9 +149,10 @@ If your estimate exceeds 400 sqm for a single residential property, you are like
 
 Also infer the visible roof material type and your confidence (0-100) in that inference.
 
-Return JSON only, with this exact shape:
-{"roof_area_sqm": <positive integer>, "roof_type": "<material id>", "confidence": <integer 0-100>}
+Additionally, return a roof_visible boolean. Set it to true ONLY if you can clearly identify a residential or commercial roof structure at the centre of the image. If you see terrain, trees, fields, water, or cannot identify a clear roof, set roof_visible to false and provide a brief fallback_reason string explaining what you see instead.
 
+Return JSON only, with this exact shape:
+{"roof_area_sqm": <positive integer>, "roof_type": "<material id>", "confidence": <integer 0-100>, "roof_visible": <boolean>, "fallback_reason": <string or null>}
 Use one of these roof_type values: asphalt_shingle, concrete_tile, colorbond, metal, tile, flat, slate.`;
 }
 
@@ -462,6 +463,8 @@ function normalizeVisionAnalysis(
     roof_type,
     complexity,
     confidence,
+    roof_visible: raw.roof_visible === false ? false : true,
+    fallback_reason: typeof raw.fallback_reason === "string" ? raw.fallback_reason : null,
     polygon_coordinates: displayPolygonPlaceholder(),
   };
 }

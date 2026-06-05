@@ -191,6 +191,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         roof_type: analysis.roof_type,
         roof_complexity: analysis.complexity,
         vision_confidence: analysis.confidence,
+        vision_roof_visible: analysis.roof_visible,
+        vision_fallback_reason: analysis.fallback_reason,
         polygon_coordinates: analysis.polygon_coordinates,
         vision_analysis_raw: JSON.stringify({ ...analysis, analysis_source: analysisSource }),
         ...quotes,

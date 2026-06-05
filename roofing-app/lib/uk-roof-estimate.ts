@@ -153,6 +153,8 @@ export function visionAnalysisFromUkFallback(
     roof_type,
     complexity,
     confidence: 58,
+    roof_visible: true,
+    fallback_reason: null,
     polygon_coordinates: fallbackVisionAnalysis().polygon_coordinates,
     source: estimate.source,
     roof_area_sqm: estimate.roof_area_sqm,

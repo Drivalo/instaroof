@@ -25,6 +25,8 @@ export function fallbackVisionAnalysis(): VisionAnalysis {
     roof_type: "asphalt_shingle",
     complexity: "moderate",
     confidence: 62,
+    roof_visible: true,
+    fallback_reason: null,
     polygon_coordinates: [
       { x: 180, y: 205 },
       { x: 430, y: 185 },

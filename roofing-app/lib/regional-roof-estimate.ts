@@ -151,6 +151,8 @@ export function visionAnalysisFromCoordinateFallback(
     roof_type,
     complexity,
     confidence: 58,
+    roof_visible: true,
+    fallback_reason: null,
     polygon_coordinates: fallbackVisionAnalysis().polygon_coordinates,
     source: `${region}_coordinate_fallback`,
     region,

@@ -8,6 +8,8 @@ export interface VisionAnalysis {
   roof_type: RoofType;
   complexity: RoofComplexity;
   confidence: number;
+  roof_visible: boolean;
+  fallback_reason: string | null;
   polygon_coordinates: Array<{ x: number; y: number }>;
 }
 

@@ -617,7 +617,15 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
-      {showGatedFlow ? (
+      {lead?.vision_roof_visible === false ? (
+        <p className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 max-w-[600px] leading-relaxed">
+          {lead.vision_fallback_reason?.trim()
+            ? lead.vision_fallback_reason
+            : "We could not clearly identify a roof in the satellite image for this property."}
+        </p>
+      ) : null}
+
+      {showGatedFlow && lead?.vision_roof_visible !== false ? (
         <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-teaser-title">
           <h2 id="quote-teaser-title" className="sr-only">
             Quote preview
@@ -808,7 +816,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
-      {detailsUnlocked && settings && hasRoofSqft ? (
+      {detailsUnlocked && lead?.vision_roof_visible !== false && settings && hasRoofSqft ? (
         <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
           <h2 id="quote-revealed-title" className="text-lg text-foreground">
             Your full quote
