@@ -579,6 +579,16 @@ function LeadDetailPanel({ lead }: { lead: AdminLead }) {
           </div>
         ))}
       </dl>
+      <div className="mt-4 pt-3 border-t border-border-subtle">
+        <a
+          href={`/admin/quote-pdf/${lead.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex rounded-lg border border-border-subtle bg-background px-4 py-2 text-sm text-foreground hover:border-accent"
+        >
+          Download PDF
+        </a>
+      </div>
     </div>
   );
 }
