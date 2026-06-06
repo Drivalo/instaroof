@@ -1,5 +1,5 @@
 -- =============================================================================
--- InstaRoof Quote — complete Supabase schema
+-- RoofCapture Quote — complete Supabase schema
 -- Copy this entire file into: Supabase Dashboard → SQL Editor → New query → Run
 -- =============================================================================
 

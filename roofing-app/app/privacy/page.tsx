@@ -3,8 +3,8 @@ import Link from "next/link";
 import { PrivacyPolicyContent } from "@/components/privacy-policy-content";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — InstaRoof",
-  description: "How InstaRoof and Nimly collect, use, and protect your personal information.",
+  title: "Privacy Policy — RoofCapture",
+  description: "How RoofCapture and Nimly collect, use, and protect your personal information.",
 };
 
 export default function PrivacyPage() {

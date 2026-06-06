@@ -1,4 +1,4 @@
-# InstaRoof Quote
+# RoofCapture Quote
 
 Full-stack lead-capture + instant quote app for roofing companies built with Next.js, Tailwind, Supabase, Stripe, Google Maps, and AI vision.
 

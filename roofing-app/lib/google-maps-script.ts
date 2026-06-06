@@ -4,7 +4,7 @@ declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     google?: any;
-    instaroofMapsInit?: () => void;
+    roofCaptureMapsInit?: () => void;
   }
 }
 
@@ -36,7 +36,7 @@ export function loadGoogleMapsScript(options: LoadGoogleMapsOptions = {}): Promi
     return Promise.resolve();
   }
 
-  const existing = document.querySelector<HTMLScriptElement>('script[data-instaroof-maps="true"]');
+  const existing = document.querySelector<HTMLScriptElement>('script[data-roofcapture-maps="true"]');
   if (existing) {
     return new Promise((resolve, reject) => {
       if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) {
@@ -47,7 +47,7 @@ export function loadGoogleMapsScript(options: LoadGoogleMapsOptions = {}): Promi
         if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) resolve();
         else reject(new Error("Google Maps library unavailable"));
       };
-      window.instaroofMapsInit = onReady;
+      window.roofCaptureMapsInit = onReady;
       existing.addEventListener("load", onReady, { once: true });
       existing.addEventListener("error", () => reject(new Error("Google Maps script failed to load")), {
         once: true,
@@ -56,16 +56,16 @@ export function loadGoogleMapsScript(options: LoadGoogleMapsOptions = {}): Promi
   }
 
   return new Promise((resolve, reject) => {
-    window.instaroofMapsInit = () => {
+    window.roofCaptureMapsInit = () => {
       if (requirePlaces ? isPlacesReady() : isMapsCoreReady()) resolve();
       else reject(new Error("Google Maps library unavailable"));
     };
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=places&callback=instaroofMapsInit`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=places&callback=roofCaptureMapsInit`;
     script.async = true;
     script.defer = true;
-    script.dataset.instaroofMaps = "true";
+    script.dataset.roofCaptureMaps = "true";
     script.onerror = () => reject(new Error("Google Maps script failed to load"));
     document.head.appendChild(script);
   });

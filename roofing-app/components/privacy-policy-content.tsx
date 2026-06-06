@@ -76,13 +76,13 @@ export function PrivacyPolicyContent() {
   return (
     <article className="max-w-3xl">
       <p className="text-muted leading-relaxed">
-        This policy explains how InstaRoof collects and uses your personal information. The section
+        This policy explains how RoofCapture collects and uses your personal information. The section
         for your region is shown based on your browser language settings.
       </p>
 
       <Section title="Who we are">
         <p>
-          InstaRoof is a roofing quote tool operated by Nimly (
+          RoofCapture is a roofing quote tool operated by Nimly (
           <a href="mailto:hello@nimly.tech" className="text-accent underline-offset-2 hover:underline">
             hello@nimly.tech
           </a>
@@ -148,10 +148,10 @@ export function PrivacyPolicyContent() {
         <p>
           We may update this policy from time to time. The latest version will always be available at{" "}
           <a
-            href="https://instaroof.app/privacy"
+            href="https://roofcapture.vercel.app/privacy"
             className="text-accent underline-offset-2 hover:underline"
           >
-            instaroof.app/privacy
+            roofcapture.vercel.app/privacy
           </a>
           .
         </p>
