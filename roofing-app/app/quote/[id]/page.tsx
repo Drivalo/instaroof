@@ -482,8 +482,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     if (!satelliteSrc) setSatelliteReady(true);
   }, [satelliteSrc]);
 
+  const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL?.trim() ?? "";
   const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
-  const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
+  const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && bookingUrl.length > 0;
   const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
 
   const modalPriceRange = useMemo(() => {
@@ -530,6 +531,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     settings,
     customerCountry,
   );
+
+  const bookInspectionLinkClass =
+    "my-8 flex w-full items-center justify-center rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90";
 
   const renderGatedContactBody = (fieldIds: {
     roofMaterial: string;
@@ -804,13 +808,14 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 formatRange={formatStandardRange}
               />
               {showBookInspectionCta ? (
-                <button
-                  type="button"
-                  onClick={openBookingModal}
-                  className="my-8 w-full rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+                <a
+                  href={bookingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={bookInspectionLinkClass}
                 >
                   Book my free inspection
-                </button>
+                </a>
               ) : null}
             </div>
           ) : materialComplete ? (
@@ -821,13 +826,14 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 formatRange={formatStandardRange}
               />
               {showBookInspectionCta ? (
-                <button
-                  type="button"
-                  onClick={openBookingModal}
-                  className="my-8 w-full rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+                <a
+                  href={bookingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={bookInspectionLinkClass}
                 >
                   Book my free inspection
-                </button>
+                </a>
               ) : null}
             </div>
           ) : (
