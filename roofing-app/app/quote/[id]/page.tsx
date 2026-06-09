@@ -188,9 +188,14 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingMaterial, setSavingMaterial] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const gutteringSectionRef = useRef<HTMLDivElement>(null);
+  const bookingSectionRef = useRef<HTMLElement>(null);
 
   const scrollToGutteringSection = useCallback(() => {
     gutteringSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const scrollToBookingSection = useCallback(() => {
+    bookingSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   useEffect(() => {
@@ -894,11 +899,27 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           ) : (
             <p className="mt-4 text-sm text-muted">Select your roof type above to see your personalised estimate.</p>
           )}
+          {(materialComplete || materialNotSure) && showBookInspectionCta ? (
+            <button
+              type="button"
+              onClick={scrollToBookingSection}
+              className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+            >
+              Book my inspection
+            </button>
+          ) : null}
         </section>
       ) : null}
 
       {showBookInspectionCta && (
-        <section className="mt-6 w-full max-w-[600px]">
+        <section
+          ref={bookingSectionRef}
+          className="mt-6 w-full max-w-[600px] scroll-mt-6"
+          aria-labelledby="quote-booking-cta-title"
+        >
+          <h2 id="quote-booking-cta-title" className="sr-only">
+            Book your inspection
+          </h2>
           <button
             type="button"
             onClick={openBookingModal}
