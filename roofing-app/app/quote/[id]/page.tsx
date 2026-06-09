@@ -793,6 +793,54 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </h1>
       ) : null}
 
+      {detailsUnlocked && lead?.vision_roof_visible !== false && settings && hasRoofSqft ? (
+        <section className="mt-4 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
+          <h2 id="quote-revealed-title" className="text-lg text-foreground">
+            Your full quote
+          </h2>
+          {materialNotSure ? (
+            <div className="mt-4">
+              <p className="text-sm text-muted mb-3">Compare materials (full replacement)</p>
+              <RoofMaterialComparisonTable
+                countryCode={customerCountry}
+                address={customerAddress}
+                roofSqft={roofSqftNumeric}
+                settings={settings}
+                formatRange={formatStandardRange}
+              />
+              {showBookInspectionCta ? (
+                <button
+                  type="button"
+                  onClick={scrollToBookingSection}
+                  className="mt-3 w-full rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+                >
+                  Book my inspection
+                </button>
+              ) : null}
+            </div>
+          ) : materialComplete ? (
+            <div className="mt-4">
+              <RoofMaterialSingleEstimate
+                low={Number(lead.quote_standard_low) || 0}
+                high={Number(lead.quote_standard_high) || 0}
+                formatRange={formatStandardRange}
+              />
+              {showBookInspectionCta ? (
+                <button
+                  type="button"
+                  onClick={scrollToBookingSection}
+                  className="mt-3 w-full rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+                >
+                  Book my inspection
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Select your roof type above to see your personalised estimate.</p>
+          )}
+        </section>
+      ) : null}
+
       {lead?.latitude != null && lead?.longitude != null ? (
         <SatelliteRoofMap
           latitude={Number(lead.latitude)}
@@ -870,45 +918,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             </Link>
           )}
         </div>
-      ) : null}
-
-      {detailsUnlocked && lead?.vision_roof_visible !== false && settings && hasRoofSqft ? (
-        <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
-          <h2 id="quote-revealed-title" className="text-lg text-foreground">
-            Your full quote
-          </h2>
-          {materialNotSure ? (
-            <div className="mt-4">
-              <p className="text-sm text-muted mb-3">Compare materials (full replacement)</p>
-              <RoofMaterialComparisonTable
-                countryCode={customerCountry}
-                address={customerAddress}
-                roofSqft={roofSqftNumeric}
-                settings={settings}
-                formatRange={formatStandardRange}
-              />
-            </div>
-          ) : materialComplete ? (
-            <div className="mt-4">
-              <RoofMaterialSingleEstimate
-                low={Number(lead.quote_standard_low) || 0}
-                high={Number(lead.quote_standard_high) || 0}
-                formatRange={formatStandardRange}
-              />
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-muted">Select your roof type above to see your personalised estimate.</p>
-          )}
-          {(materialComplete || materialNotSure) && showBookInspectionCta ? (
-            <button
-              type="button"
-              onClick={scrollToBookingSection}
-              className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
-            >
-              Book my inspection
-            </button>
-          ) : null}
-        </section>
       ) : null}
 
       {showBookInspectionCta && (
