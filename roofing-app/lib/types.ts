@@ -5,6 +5,7 @@ export type RoofComplexity = "simple" | "moderate" | "complex";
 
 export interface VisionAnalysis {
   roof_sqft: number;
+  roof_area_sqm: number | null;
   roof_type: RoofType;
   complexity: RoofComplexity;
   confidence: number;

@@ -8,18 +8,29 @@ export const STAGE1_ROOF_SIZE_LABEL = "Estimated roof size (typical for your are
 /** Internal sq ft ↔ m² display (matches formatRoofAreaDisplay). */
 const SQFT_PER_SQM = 0.092903;
 
-const STAGE1_MEDIAN_ROOF_SQM: Record<string, number> = {
+/**
+ * Supported markets and Stage 1 median roof areas (m²).
+ * Used for homepage instant estimates and analyze-route fallback when GPT-4o returns no roof_area_sqm.
+ * DEFAULT (unresolved country): 120 m² via stage1MedianRoofSqm().
+ */
+export const STAGE1_SUPPORTED_COUNTRY_MEDIAN_ROOF_SQM = {
   GB: 90,
   AU: 180,
   NZ: 160,
   US: 200,
   CA: 185,
-};
+} as const;
+
+export type Stage1CountryRegion = keyof typeof STAGE1_SUPPORTED_COUNTRY_MEDIAN_ROOF_SQM | "DEFAULT";
+
+export const STAGE1_DEFAULT_MEDIAN_ROOF_SQM = 120;
+
+const STAGE1_MEDIAN_ROOF_SQM: Record<string, number> = STAGE1_SUPPORTED_COUNTRY_MEDIAN_ROOF_SQM;
 
 function normalizeStage1CountryCode(
   countryCode?: string | null,
   address?: string | null,
-): keyof typeof STAGE1_MEDIAN_ROOF_SQM | "DEFAULT" {
+): Stage1CountryRegion {
   const code = String(countryCode ?? "")
     .trim()
     .toUpperCase();
@@ -51,8 +62,16 @@ export function stage1MedianRoofSqm(
   address?: string | null,
 ): number {
   const region = normalizeStage1CountryCode(countryCode, address);
-  if (region === "DEFAULT") return 120;
+  if (region === "DEFAULT") return STAGE1_DEFAULT_MEDIAN_ROOF_SQM;
   return STAGE1_MEDIAN_ROOF_SQM[region];
+}
+
+/** Resolved Stage 1 market key for a lead (GB, AU, NZ, US, CA, or DEFAULT). */
+export function stage1CountryRegion(
+  countryCode?: string | null,
+  address?: string | null,
+): Stage1CountryRegion {
+  return normalizeStage1CountryCode(countryCode, address);
 }
 
 /** Stage 1 roof size stored as internal sq ft (derived from regional median m²). */

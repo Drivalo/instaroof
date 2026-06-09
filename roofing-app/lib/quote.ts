@@ -22,6 +22,7 @@ export function calcQuoteRanges(roofSqft: number, roofType: RoofType, settings: 
 export function fallbackVisionAnalysis(): VisionAnalysis {
   return {
     roof_sqft: 2200,
+    roof_area_sqm: null,
     roof_type: "asphalt_shingle",
     complexity: "moderate",
     confidence: 62,

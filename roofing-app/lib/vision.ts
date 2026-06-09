@@ -96,6 +96,7 @@ function countryRoofSizeGuidance(countryCode: string | null | undefined): string
   return "A typical residential property has a roof area of 80-250 sqm.";
 }
 
+/** Suspicious-AI cap fallback only (not Stage 1 medians). Country medians: lib/roof-estimate STAGE1_SUPPORTED_COUNTRY_MEDIAN_ROOF_SQM. */
 function suspiciousRoofAreaFallbackSqm(country: VisionCountry): number {
   switch (country) {
     case "GB":
@@ -460,6 +461,7 @@ function normalizeVisionAnalysis(
 
   return {
     roof_sqft,
+    roof_area_sqm: roofAreaSqm,
     roof_type,
     complexity,
     confidence,
