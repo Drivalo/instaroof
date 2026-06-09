@@ -184,6 +184,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     const quotes = calcQuoteRanges(analysis.roof_sqft, analysis.roof_type, settings);
 
+    console.log("[vision/analyze] raw GPT-4o roof_area_sqm:", (analysis as { roof_area_sqm?: unknown }).roof_area_sqm);
+
     const { data: updated, error: updateError } = await supabase
       .from("leads")
       .update({
