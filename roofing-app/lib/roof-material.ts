@@ -40,7 +40,7 @@ const MATERIALS_BY_REGION: Record<MaterialRegion, RoofMaterialOption[]> = {
     { id: "concrete_tiles", label: "Concrete tiles", icon: "🧱" },
     { id: "zincalume", label: "Zincalume", icon: "🔩" },
     { id: "slate", label: "Slate", icon: "🪨" },
-    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure — show me all options", icon: "❓" },
+    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure? Show me all options", icon: "❓" },
   ],
   NZ: [
     { id: "colorbond", label: "Colorbond", icon: "🏗️" },
@@ -48,7 +48,7 @@ const MATERIALS_BY_REGION: Record<MaterialRegion, RoofMaterialOption[]> = {
     { id: "terracotta_tiles", label: "Terracotta tiles", icon: "🧱" },
     { id: "zincalume", label: "Zincalume", icon: "🔩" },
     { id: "slate", label: "Slate", icon: "🪨" },
-    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure — show me all options", icon: "❓" },
+    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure? Show me all options", icon: "❓" },
   ],
   GB: [
     { id: "concrete_tiles", label: "Concrete tiles", icon: "🧱" },
@@ -56,7 +56,7 @@ const MATERIALS_BY_REGION: Record<MaterialRegion, RoofMaterialOption[]> = {
     { id: "slate", label: "Slate", icon: "🪨" },
     { id: "felt_flat", label: "Felt (flat roof)", icon: "📐" },
     { id: "metal", label: "Metal", icon: "🔩" },
-    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure — show me all options", icon: "❓" },
+    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure? Show me all options", icon: "❓" },
   ],
   US_CA: [
     { id: "asphalt_shingles", label: "Asphalt shingles", icon: "🏠" },
@@ -64,14 +64,14 @@ const MATERIALS_BY_REGION: Record<MaterialRegion, RoofMaterialOption[]> = {
     { id: "slate", label: "Slate", icon: "🪨" },
     { id: "clay_terracotta", label: "Clay/terracotta tiles", icon: "🧱" },
     { id: "wood_shingles", label: "Wood shingles", icon: "🪵" },
-    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure — show me all options", icon: "❓" },
+    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure? Show me all options", icon: "❓" },
   ],
   DEFAULT: [
     { id: "tiles", label: "Tiles", icon: "🧱" },
     { id: "metal", label: "Metal", icon: "🔩" },
     { id: "slate", label: "Slate", icon: "🪨" },
     { id: "other", label: "Other", icon: "🏠" },
-    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure — show me all options", icon: "❓" },
+    { id: ROOF_MATERIAL_NOT_SURE, label: "Not sure? Show me all options", icon: "❓" },
   ],
 };
 

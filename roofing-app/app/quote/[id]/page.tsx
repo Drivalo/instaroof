@@ -9,7 +9,7 @@ import {
   RoofMaterialSelector,
   RoofMaterialSingleEstimate,
 } from "@/components/roof-material-panel";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { gutteringInspectionQuestion } from "@/lib/guttering-inspection";
 import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
 import { isRoofMaterialNotSure } from "@/lib/roof-material";
@@ -187,6 +187,11 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingGuttering, setSavingGuttering] = useState(false);
   const [savingMaterial, setSavingMaterial] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const gutteringSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToGutteringSection = useCallback(() => {
+    gutteringSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -545,10 +550,19 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           disabled={savingMaterial}
           onSelect={(materialId) => void saveRoofMaterial(materialId)}
         />
+        {materialComplete ? (
+          <button
+            type="button"
+            onClick={scrollToGutteringSection}
+            className="mt-4 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+          >
+            Next
+          </button>
+        ) : null}
       </div>
       {materialComplete ? (
         <>
-          <div className="mt-6 space-y-3">
+          <div ref={gutteringSectionRef} className="mt-6 space-y-3 scroll-mt-4">
             <p className="text-sm text-muted leading-relaxed">
               {gutteringInspectionQuestion(customerCountry)}
             </p>
