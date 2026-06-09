@@ -149,6 +149,26 @@ function formatDepositPrice(
   }
 }
 
+function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
 export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
@@ -660,11 +680,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             <h2 id="quote-details-modal-title" className="text-xl md:text-2xl text-foreground">
               Your estimate is ready
             </h2>
-            <p className="mt-2 text-sm text-muted leading-relaxed">
-              Enter your details to reveal your full quote
-            </p>
             {hasRoofSqft && lead?.vision_roof_visible !== false ? (
-              <div className="mt-4 rounded-lg border border-border-subtle bg-background/50 p-4 space-y-2 text-sm text-foreground">
+              <div className="mt-4 rounded-lg border border-border-subtle bg-background/50 p-4 space-y-3 text-sm text-foreground">
                 <p>
                   Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
                 </p>
@@ -674,9 +691,23 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                   </p>
                 ) : null}
                 {modalPriceRange ? (
-                  <p>
-                    Price range: <strong>{modalPriceRange}</strong>
-                  </p>
+                  <div>
+                    <p className="text-sm text-muted">Price range</p>
+                    <div className="relative mt-2 min-h-[2.75rem] flex items-center justify-center">
+                      <p
+                        className="text-lg font-medium text-foreground blur-[14px] select-none pointer-events-none"
+                        aria-hidden
+                      >
+                        {modalPriceRange}
+                      </p>
+                      <div className="absolute inset-0 flex items-center justify-center text-muted">
+                        <LockIcon className="text-foreground/70" />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-center text-muted leading-relaxed">
+                      Enter your details to reveal your full quote
+                    </p>
+                  </div>
                 ) : null}
               </div>
             ) : null}
