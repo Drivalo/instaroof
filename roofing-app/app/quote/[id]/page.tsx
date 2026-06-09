@@ -9,7 +9,7 @@ import {
   RoofMaterialSelector,
   RoofMaterialSingleEstimate,
 } from "@/components/roof-material-panel";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { gutteringInspectionQuestion } from "@/lib/guttering-inspection";
 import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
 import { isRoofMaterialNotSure } from "@/lib/roof-material";
@@ -204,6 +204,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingGuttering, setSavingGuttering] = useState(false);
   const [savingMaterial, setSavingMaterial] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const contactFormRef = useRef<HTMLElement>(null);
+  const contactModalAutoOpened = useRef(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -499,6 +502,36 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const showGatedFlow = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
   const placeholderRange = placeholderQuoteRangeLabel(customerAddress, customerCountry);
 
+  const openContactModal = useCallback(() => {
+    setContactModalOpen(true);
+  }, []);
+
+  const scrollToContactForm = useCallback(() => {
+    setContactModalOpen(true);
+    requestAnimationFrame(() => {
+      contactFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showGatedFlow || contactModalAutoOpened.current) return;
+    contactModalAutoOpened.current = true;
+    setContactModalOpen(true);
+  }, [showGatedFlow]);
+
+  useEffect(() => {
+    if (!contactModalOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [contactModalOpen]);
+
+  useEffect(() => {
+    if (detailsUnlocked) setContactModalOpen(false);
+  }, [detailsUnlocked]);
+
   useEffect(() => {
     if (!showBookingModal) return;
     const prev = document.body.style.overflow;
@@ -517,8 +550,153 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     customerCountry,
   );
 
+  const renderGatedContactBody = (fieldIds: {
+    roofMaterial: string;
+    jobType: string;
+    name: string;
+    email: string;
+    phone: string;
+  }) => (
+    <>
+      <div className="mt-6 space-y-3">
+        <p id={fieldIds.roofMaterial} className="text-sm text-muted">
+          What type of roof do you have?
+        </p>
+        <RoofMaterialSelector
+          countryCode={customerCountry}
+          address={customerAddress}
+          selectedId={selectedMaterialId}
+          disabled={savingMaterial}
+          onSelect={(materialId) => void saveRoofMaterial(materialId)}
+        />
+      </div>
+      {materialComplete ? (
+        <>
+          <div className="mt-6 space-y-3">
+            <p className="text-sm text-muted leading-relaxed">
+              {gutteringInspectionQuestion(customerCountry)}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={savingGuttering}
+                onClick={() => void saveGuttering(true, "yes")}
+                className={gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase}
+              >
+                Yes please
+              </button>
+              <button
+                type="button"
+                disabled={savingGuttering}
+                onClick={() => void saveGuttering(false, "no")}
+                className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
+              >
+                No thanks
+              </button>
+            </div>
+          </div>
+          <div className="mt-6 space-y-3">
+            <p id={fieldIds.jobType} className="text-sm text-muted">
+              What best describes your situation?
+            </p>
+            <div className="space-y-2" role="radiogroup" aria-labelledby={fieldIds.jobType}>
+              {JOB_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={jobType === opt.value}
+                  onClick={() => setJobType(opt.value)}
+                  className={jobType === opt.value ? slotButtonSelected : slotButtonBase}
+                >
+                  {opt.emoji} {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label htmlFor={fieldIds.name} className="block text-sm text-muted mb-1.5">
+                First name
+              </label>
+              <input
+                id={fieldIds.name}
+                type="text"
+                required
+                autoComplete="given-name"
+                className={contactFieldClass}
+                placeholder="First name"
+                value={contact.name}
+                onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor={fieldIds.email} className="block text-sm text-muted mb-1.5">
+                Email
+              </label>
+              <input
+                id={fieldIds.email}
+                type="email"
+                required
+                autoComplete="email"
+                className={contactFieldClass}
+                placeholder="Email"
+                value={contact.email}
+                onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor={fieldIds.phone} className="block text-sm text-muted mb-1.5">
+                Phone
+              </label>
+              <input
+                id={fieldIds.phone}
+                type="tel"
+                required
+                autoComplete="tel"
+                className={contactFieldClass}
+                placeholder="Phone number"
+                value={contact.phone}
+                onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+              />
+            </div>
+          </div>
+          <label className="mt-4 flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={privacyConsent}
+              onChange={(e) => setPrivacyConsent(e.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border-subtle bg-background accent-[#F5A623]"
+            />
+            <span className="text-sm text-muted leading-relaxed">
+              I agree to my personal data being processed to generate and deliver my roof quote.{" "}
+              <Link href="/privacy" className="text-accent underline-offset-2 hover:underline">
+                View our Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={() => void handleRevealQuote()}
+            disabled={!contactReady || savingContact}
+            className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {savingContact ? "Saving…" : "Reveal my quote"}
+          </button>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-muted">Select your roof type above to continue.</p>
+      )}
+    </>
+  );
+
   return (
-    <main className="customer-page container-max py-8 relative">
+    <main
+      className={`customer-page container-max py-8 relative${
+        showGatedFlow && !contactModalOpen ? " pb-28 md:pb-8" : ""
+      }`}
+    >
       {showBookingModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none overflow-y-auto"
@@ -624,15 +802,27 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             <p className="mt-2">{lead.vision_fallback_reason}</p>
           ) : null}
           <p className="mt-2">Fill in your details below and we&apos;ll get in touch to book a free inspection.</p>
+          {showGatedFlow ? (
+            <button
+              type="button"
+              onClick={openContactModal}
+              className="mt-4 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-semibold text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+            >
+              Reveal my quote
+            </button>
+          ) : null}
         </div>
       ) : null}
 
       {showGatedFlow && lead?.vision_roof_visible !== false ? (
-        <section className="mt-6 max-w-[600px] w-full" aria-labelledby="quote-teaser-title">
+        <section
+          className="mt-6 max-w-[600px] w-full sticky top-0 z-30 md:static md:z-auto"
+          aria-labelledby="quote-teaser-title"
+        >
           <h2 id="quote-teaser-title" className="sr-only">
             Quote preview
           </h2>
-          <div className="relative rounded-xl border border-border-subtle bg-surface p-6 overflow-hidden">
+          <div className="relative rounded-xl border border-border-subtle bg-surface p-6 overflow-hidden shadow-lg md:shadow-none">
             <p className="text-sm text-muted">Your estimated price range</p>
             <div className="relative mt-3 min-h-[4.5rem] flex items-center justify-center">
               <p
@@ -648,152 +838,99 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             <p className="mt-4 text-sm text-center text-muted leading-relaxed">
               Enter your details to reveal your full quote
             </p>
+            <button
+              type="button"
+              onClick={scrollToContactForm}
+              className="mt-4 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-semibold text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 shadow-md"
+            >
+              Reveal my quote
+            </button>
           </div>
         </section>
       ) : null}
 
       {showGatedFlow ? (
-        <section
-          className="mt-8 max-w-[600px] w-full rounded-xl border border-border-subtle bg-surface p-6 md:p-8"
-          aria-labelledby="quote-contact-title"
-        >
-          <h2 id="quote-contact-title" className="text-xl text-foreground">
-            Your details
-          </h2>
-          <p className="mt-2 text-sm text-muted leading-relaxed">
-            Tell us about your roof and how to reach you. We will show your full quote right after.
-          </p>
-          <div className="mt-6 space-y-3">
-            <p id="roof-material-label" className="text-sm text-muted">
-              What type of roof do you have?
-            </p>
-            <RoofMaterialSelector
-              countryCode={customerCountry}
-              address={customerAddress}
-              selectedId={selectedMaterialId}
-              disabled={savingMaterial}
-              onSelect={(materialId) => void saveRoofMaterial(materialId)}
-            />
-          </div>
-          {materialComplete ? (
-            <>
-              <div className="mt-6 space-y-3">
-                <p className="text-sm text-muted leading-relaxed">
-                  {gutteringInspectionQuestion(customerCountry)}
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    disabled={savingGuttering}
-                    onClick={() => void saveGuttering(true, "yes")}
-                    className={gutteringChoice === "yes" ? slotButtonSelected : slotButtonBase}
-                  >
-                    Yes please
-                  </button>
-                  <button
-                    type="button"
-                    disabled={savingGuttering}
-                    onClick={() => void saveGuttering(false, "no")}
-                    className={gutteringChoice === "no" ? slotButtonSelected : slotButtonBase}
-                  >
-                    No thanks
-                  </button>
-                </div>
-              </div>
-              <div className="mt-6 space-y-3">
-                <p id="job-type-label" className="text-sm text-muted">
-                  What best describes your situation?
-                </p>
-                <div className="space-y-2" role="radiogroup" aria-labelledby="job-type-label">
-                  {JOB_TYPE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={jobType === opt.value}
-                      onClick={() => setJobType(opt.value)}
-                      className={jobType === opt.value ? slotButtonSelected : slotButtonBase}
-                    >
-                      {opt.emoji} {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-6 space-y-4">
-                <div>
-                  <label htmlFor="quote-name" className="block text-sm text-muted mb-1.5">
-                    First name
-                  </label>
-                  <input
-                    id="quote-name"
-                    type="text"
-                    required
-                    autoComplete="given-name"
-                    className={contactFieldClass}
-                    placeholder="First name"
-                    value={contact.name}
-                    onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="quote-email" className="block text-sm text-muted mb-1.5">
-                    Email
-                  </label>
-                  <input
-                    id="quote-email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    className={contactFieldClass}
-                    placeholder="Email"
-                    value={contact.email}
-                    onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="quote-phone" className="block text-sm text-muted mb-1.5">
-                    Phone
-                  </label>
-                  <input
-                    id="quote-phone"
-                    type="tel"
-                    required
-                    autoComplete="tel"
-                    className={contactFieldClass}
-                    placeholder="Phone number"
-                    value={contact.phone}
-                    onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <label className="mt-4 flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={privacyConsent}
-                  onChange={(e) => setPrivacyConsent(e.target.checked)}
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-border-subtle bg-background accent-[#F5A623]"
-                />
-                <span className="text-sm text-muted leading-relaxed">
-                  I agree to my personal data being processed to generate and deliver my roof quote.{" "}
-                  <Link href="/privacy" className="text-accent underline-offset-2 hover:underline">
-                    View our Privacy Policy
-                  </Link>
-                  .
-                </span>
-              </label>
+        <>
+          {contactModalOpen ? (
+            <div
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quote-contact-modal-title"
+            >
               <button
                 type="button"
-                onClick={() => void handleRevealQuote()}
-                disabled={!contactReady || savingContact}
-                className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {savingContact ? "Saving…" : "Reveal my quote"}
-              </button>
-            </>
+                className="absolute inset-0 bg-black/60"
+                aria-label="Close quote form"
+                onClick={() => setContactModalOpen(false)}
+              />
+              <div className="relative z-10 w-full max-w-[600px] max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl">
+                <button
+                  type="button"
+                  onClick={() => setContactModalOpen(false)}
+                  className="absolute top-4 right-4 rounded-lg p-2 text-muted hover:text-foreground hover:bg-background transition-colors"
+                  aria-label="Close"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                <section
+                  ref={contactFormRef}
+                  id="quote-contact-form"
+                  aria-labelledby="quote-contact-modal-title"
+                >
+                  <h2 id="quote-contact-modal-title" className="text-xl text-foreground pr-10">
+                    Your details
+                  </h2>
+                  <p className="mt-2 text-sm text-muted leading-relaxed">
+                    Tell us about your roof and how to reach you. We will show your full quote right after.
+                  </p>
+                  {renderGatedContactBody({
+                    roofMaterial: "roof-material-label",
+                    jobType: "job-type-label",
+                    name: "quote-name",
+                    email: "quote-email",
+                    phone: "quote-phone",
+                  })}
+                </section>
+              </div>
+            </div>
           ) : (
-            <p className="mt-4 text-sm text-muted">Select your roof type above to continue.</p>
+            <section
+              ref={contactFormRef}
+              id="quote-contact-form"
+              className="mt-8 max-w-[600px] w-full rounded-xl border border-border-subtle bg-surface p-6 md:p-8 scroll-mt-6"
+              aria-labelledby="quote-contact-title"
+            >
+              <h2 id="quote-contact-title" className="text-xl text-foreground">
+                Your details
+              </h2>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
+                Tell us about your roof and how to reach you. We will show your full quote right after.
+              </p>
+              {renderGatedContactBody({
+                roofMaterial: "roof-material-label-inline",
+                jobType: "job-type-label-inline",
+                name: "quote-name-inline",
+                email: "quote-email-inline",
+                phone: "quote-phone-inline",
+              })}
+            </section>
           )}
-        </section>
+
+          {!contactModalOpen ? (
+            <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-surface/95 backdrop-blur-md p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.15)] md:hidden">
+              <button
+                type="button"
+                onClick={openContactModal}
+                className="w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-semibold text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+              >
+                Reveal my quote
+              </button>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
