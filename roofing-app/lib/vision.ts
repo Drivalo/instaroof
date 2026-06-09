@@ -79,19 +79,19 @@ function countryRoofSizeGuidance(countryCode: string | null | undefined): string
     .trim()
     .toUpperCase();
   if (code === "UK" || code === "GB") {
-    return "A typical UK semi-detached house has a roof area of 50-120 sqm. A detached house is typically 80-200 sqm.";
+    return "UK terraced houses typically have roofs of 50-80 sqm. Semi-detached houses are typically 70-110 sqm. Detached houses are typically 100-200 sqm. Measure the actual roof visible in the image — do not estimate from the midpoint of these ranges.";
   }
   if (code === "AU" || code === "AUS") {
-    return "A typical Australian suburban home has a roof area of 100-250 sqm.";
+    return "Australian homes vary significantly. A small cottage may be 80-120 sqm. A typical suburban home is 130-180 sqm. A large home is 200-300 sqm. Measure the actual roof visible in the image — do not estimate from the midpoint of these ranges.";
   }
   if (code === "NZ" || code === "NZL") {
-    return "A typical New Zealand home has a roof area of 80-200 sqm.";
+    return "New Zealand homes typically have roofs of 80-180 sqm. Measure the actual roof visible in the image — do not estimate from the midpoint of these ranges.";
   }
   if (code === "US") {
-    return "A typical US single-family home has a roof area of 150-300 sqm (1,600-3,200 sqft).";
+    return "US single-family homes typically have roofs of 140-280 sqm. Measure the actual roof visible in the image — do not estimate from the midpoint of these ranges.";
   }
   if (code === "CA") {
-    return "A typical Canadian single-family home has a roof area of 130-280 sqm.";
+    return "Canadian single-family homes typically have roofs of 120-250 sqm. Measure the actual roof visible in the image — do not estimate from the midpoint of these ranges.";
   }
   return "A typical residential property has a roof area of 80-250 sqm.";
 }
