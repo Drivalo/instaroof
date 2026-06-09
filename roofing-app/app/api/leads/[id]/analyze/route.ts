@@ -118,7 +118,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let analysisSource = "gpt4o_vision";
 
     try {
-      analysis = await runVisionAnalysis(staticUrlForVision, lead.country_code);
+      analysis = await runVisionAnalysis(staticUrlForVision, lead.country_code, lead.latitude);
     } catch (visionError) {
       const fallbackRegion = detectCoordinateFallbackRegion(
         lead.latitude,

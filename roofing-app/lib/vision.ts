@@ -137,9 +137,16 @@ Measure ONLY the roof of the single residential property at the centre of the im
 
 Human identification is not part of this task. Do not name, count, describe, or infer people, occupants, vehicles, or personal information.`;
 
-function buildVisionUserPrompt(countryCode: string | null | undefined): string {
+function buildVisionUserPrompt(
+  countryCode: string | null | undefined,
+  tileSpanMetres?: number,
+): string {
   const country = normalizeVisionCountry(countryCode);
   const guidance = countryRoofSizeGuidance(countryCode);
+  const scaleReference =
+    tileSpanMetres != null
+      ? `\n\nThe satellite tile covers approximately ${tileSpanMetres} metres across — use this as a scale reference when estimating roof area.`
+      : "";
   return `Estimate the total roof surface area in square metres from this map tile.
 
 CRITICAL: Measure ONLY the roof of the single residential property at the centre of the image. Do not include neighbouring roofs, the full building footprint on multiple lots, gardens, roads, or the entire satellite tile.
@@ -154,7 +161,7 @@ Additionally, return a roof_visible boolean. Set it to true ONLY if you can clea
 
 Return JSON only, with this exact shape:
 {"roof_area_sqm": <positive integer>, "roof_type": "<material id>", "confidence": <integer 0-100>, "roof_visible": <boolean>, "fallback_reason": <string or null>}
-Use one of these roof_type values: asphalt_shingle, concrete_tile, colorbond, metal, tile, flat, slate.`;
+Use one of these roof_type values: asphalt_shingle, concrete_tile, colorbond, metal, tile, flat, slate.${scaleReference}`;
 }
 
 /** Placeholder overlay for the quote UI — not requested from the model (reduces refusals). */
@@ -474,6 +481,7 @@ function normalizeVisionAnalysis(
 async function runVisionAnalysisInner(
   imageUrl: string,
   countryCode: string | null | undefined,
+  latitude?: number | null,
 ): Promise<VisionAnalysis> {
   console.info(`${LOG_PREFIX} runVisionAnalysisInner start`);
   const apiKey = getOpenAiApiKey();
@@ -484,6 +492,13 @@ async function runVisionAnalysisInner(
 
   const imageDataUrl = await satelliteImageToDataUrl(imageUrl, VISION_ANALYSIS_TIMEOUT_MS);
   const encodedKb = Math.round(imageDataUrl.length / 1024);
+  const tileSpanMetres =
+    latitude != null
+      ? Math.round(
+          (156543.03392 * Math.cos(((latitude ?? 0) * Math.PI) / 180) / Math.pow(2, SATELLITE_STATIC_ZOOM)) *
+            600,
+        )
+      : undefined;
   console.info(`${LOG_PREFIX} Sending to GPT-4o:`, {
     satelliteUrl: maskGoogleMapsKeyInUrl(imageUrl),
     encodedPayloadKb: encodedKb,
@@ -512,10 +527,13 @@ async function runVisionAnalysisInner(
           {
             role: "user",
             content: [
-              { type: "text", text: buildVisionUserPrompt(countryCode) },
+              {
+                type: "text",
+                text: buildVisionUserPrompt(countryCode, tileSpanMetres),
+              },
               {
                 type: "image_url",
-                image_url: { url: imageDataUrl, detail: "low" },
+                image_url: { url: imageDataUrl, detail: "high" },
               },
             ],
           },
@@ -584,6 +602,7 @@ async function runVisionAnalysisInner(
 export async function runVisionAnalysis(
   imageUrl: string,
   countryCode?: string | null,
+  latitude?: number | null,
 ): Promise<VisionAnalysis> {
   ensureEnvLoaded();
   const timeoutMs = VISION_ANALYSIS_TIMEOUT_MS;
@@ -595,7 +614,7 @@ export async function runVisionAnalysis(
 
   try {
     const result = await Promise.race([
-      runVisionAnalysisInner(imageUrl, countryCode),
+      runVisionAnalysisInner(imageUrl, countryCode, latitude),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new VisionAnalysisTimeoutError()), timeoutMs);
       }),
