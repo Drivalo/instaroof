@@ -9,11 +9,11 @@ import {
   RoofMaterialSelector,
   RoofMaterialSingleEstimate,
 } from "@/components/roof-material-panel";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { gutteringInspectionQuestion } from "@/lib/guttering-inspection";
 import { JOB_TYPE_OPTIONS, isValidJobType, type JobType } from "@/lib/job-type";
 import { isRoofMaterialNotSure } from "@/lib/roof-material";
-import { formatRoofAreaLabel, formatRoofSquares, usesImperialRoofDisplay } from "@/lib/roof-estimate";
+import { formatRoofAreaLabel, formatRoofSquares, previewPriceRangeFromEstimate, usesImperialRoofDisplay } from "@/lib/roof-estimate";
 import { SettingsRow } from "@/lib/types";
 
 const contactFieldClass =
@@ -149,43 +149,6 @@ function formatDepositPrice(
   }
 }
 
-/** Placeholder only; real quote amounts are not shown before contact unlock. */
-function placeholderQuoteRangeLabel(address: string, countryCode?: string | null): string {
-  const currency = detectQuoteCurrency(address, countryCode);
-  switch (currency) {
-    case "GB":
-      return "£XX,XXX - £XX,XXX";
-    case "AU":
-      return "A$XX,XXX - A$XX,XXX";
-    case "NZ":
-      return "NZ$XX,XXX - NZ$XX,XXX";
-    case "CA":
-      return "C$XX,XXX - C$XX,XXX";
-    default:
-      return "$XX,XXX - $XX,XXX";
-  }
-}
-
-function LockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect x="5" y="11" width="14" height="10" rx="2" />
-      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-    </svg>
-  );
-}
-
 export default function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
@@ -204,9 +167,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingGuttering, setSavingGuttering] = useState(false);
   const [savingMaterial, setSavingMaterial] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [contactModalOpen, setContactModalOpen] = useState(false);
-  const contactFormRef = useRef<HTMLElement>(null);
-  const contactModalAutoOpened = useRef(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -499,47 +459,43 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
   const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
   const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && !showBookingModal;
-  const showGatedFlow = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
-  const placeholderRange = placeholderQuoteRangeLabel(customerAddress, customerCountry);
+  const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
 
-  const openContactModal = useCallback(() => {
-    setContactModalOpen(true);
-  }, []);
-
-  const scrollToContactForm = useCallback(() => {
-    setContactModalOpen(true);
-    requestAnimationFrame(() => {
-      contactFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, []);
+  const modalPriceRange = useMemo(() => {
+    if (!lead || !settings) return null;
+    const low = Number(lead.quote_standard_low);
+    const high = Number(lead.quote_standard_high);
+    if ((Number.isFinite(low) && low > 0) || (Number.isFinite(high) && high > 0)) {
+      return formatStandardRange(low, high);
+    }
+    if (hasRoofSqft) {
+      return previewPriceRangeFromEstimate(
+        roofSqftNumeric,
+        customerAddress,
+        settings,
+        customerCountry,
+      );
+    }
+    return null;
+  }, [
+    lead,
+    settings,
+    hasRoofSqft,
+    roofSqftNumeric,
+    customerAddress,
+    customerCountry,
+    formatStandardRange,
+  ]);
 
   useEffect(() => {
-    if (!showGatedFlow || contactModalAutoOpened.current) return;
-    contactModalAutoOpened.current = true;
-    setContactModalOpen(true);
-  }, [showGatedFlow]);
-
-  useEffect(() => {
-    if (!contactModalOpen) return;
+    const lockScroll = showDetailsModal || showBookingModal;
+    if (!lockScroll) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [contactModalOpen]);
-
-  useEffect(() => {
-    if (detailsUnlocked) setContactModalOpen(false);
-  }, [detailsUnlocked]);
-
-  useEffect(() => {
-    if (!showBookingModal) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [showBookingModal]);
+  }, [showDetailsModal, showBookingModal]);
 
   if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
 
@@ -682,7 +638,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             disabled={!contactReady || savingContact}
             className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {savingContact ? "Saving…" : "Reveal my quote"}
+            {savingContact ? "Saving…" : "Reveal my full quote"}
           </button>
         </>
       ) : (
@@ -692,11 +648,49 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   );
 
   return (
-    <main
-      className={`customer-page container-max py-8 relative${
-        showGatedFlow && !contactModalOpen ? " pb-28 md:pb-8" : ""
-      }`}
-    >
+    <main className="customer-page container-max py-8 relative">
+      {showDetailsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#1C1C1C]/85"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quote-details-modal-title"
+        >
+          <div className="w-full sm:max-w-lg max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-t-2xl sm:rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl">
+            <h2 id="quote-details-modal-title" className="text-xl md:text-2xl text-foreground">
+              Your estimate is ready
+            </h2>
+            <p className="mt-2 text-sm text-muted leading-relaxed">
+              Enter your details to reveal your full quote
+            </p>
+            {hasRoofSqft && lead?.vision_roof_visible !== false ? (
+              <div className="mt-4 rounded-lg border border-border-subtle bg-background/50 p-4 space-y-2 text-sm text-foreground">
+                <p>
+                  Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
+                </p>
+                {imperialRoofMeasurements ? (
+                  <p>
+                    Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
+                  </p>
+                ) : null}
+                {modalPriceRange ? (
+                  <p>
+                    Price range: <strong>{modalPriceRange}</strong>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {renderGatedContactBody({
+              roofMaterial: "roof-material-label",
+              jobType: "job-type-label",
+              name: "quote-name",
+              email: "quote-email",
+              phone: "quote-phone",
+            })}
+          </div>
+        </div>
+      )}
+
       {showBookingModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none overflow-y-auto"
@@ -725,7 +719,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                     onClick={() => setInspectionSlot(s)}
                     className={inspectionSlot === s ? slotButtonSelected : slotButtonBase}
                   >
-                    {format(new Date(s), "EEE, MMM d — h:mm a")}
+                    {format(new Date(s), "EEE, MMM d 'at' h:mm a")}
                   </button>
                 ))
               )}
@@ -742,6 +736,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
+      <div className={showDetailsModal ? "pointer-events-none select-none blur-sm" : undefined}>
       {hasQuoteEstimates ? (
         <h1 className="text-2xl md:text-3xl text-foreground mt-6 max-w-[600px]">
           {detailsUnlocked ? "Your quote" : "Your roof has been analysed"}
@@ -801,136 +796,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           {lead.vision_fallback_reason?.trim() ? (
             <p className="mt-2">{lead.vision_fallback_reason}</p>
           ) : null}
-          <p className="mt-2">Fill in your details below and we&apos;ll get in touch to book a free inspection.</p>
-          {showGatedFlow ? (
-            <button
-              type="button"
-              onClick={openContactModal}
-              className="mt-4 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-semibold text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
-            >
-              Reveal my quote
-            </button>
-          ) : null}
+          <p className="mt-2">Fill in your details in the popup to get in touch and book a free inspection.</p>
         </div>
-      ) : null}
-
-      {showGatedFlow && lead?.vision_roof_visible !== false ? (
-        <section
-          className="mt-6 max-w-[600px] w-full sticky top-0 z-30 md:static md:z-auto"
-          aria-labelledby="quote-teaser-title"
-        >
-          <h2 id="quote-teaser-title" className="sr-only">
-            Quote preview
-          </h2>
-          <div className="relative rounded-xl border border-border-subtle bg-surface p-6 overflow-hidden shadow-lg md:shadow-none">
-            <p className="text-sm text-muted">Your estimated price range</p>
-            <div className="relative mt-3 min-h-[4.5rem] flex items-center justify-center">
-              <p
-                className="text-2xl text-foreground blur-[14px] select-none pointer-events-none"
-                aria-hidden
-              >
-                {placeholderRange}
-              </p>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted">
-                <LockIcon className="text-foreground/70" />
-              </div>
-            </div>
-            <p className="mt-4 text-sm text-center text-muted leading-relaxed">
-              Enter your details to reveal your full quote
-            </p>
-            <button
-              type="button"
-              onClick={scrollToContactForm}
-              className="mt-4 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-semibold text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 shadow-md"
-            >
-              Reveal my quote
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {showGatedFlow ? (
-        <>
-          {contactModalOpen ? (
-            <div
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="quote-contact-modal-title"
-            >
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/60"
-                aria-label="Close quote form"
-                onClick={() => setContactModalOpen(false)}
-              />
-              <div className="relative z-10 w-full max-w-[600px] max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl">
-                <button
-                  type="button"
-                  onClick={() => setContactModalOpen(false)}
-                  className="absolute top-4 right-4 rounded-lg p-2 text-muted hover:text-foreground hover:bg-background transition-colors"
-                  aria-label="Close"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-                <section
-                  ref={contactFormRef}
-                  id="quote-contact-form"
-                  aria-labelledby="quote-contact-modal-title"
-                >
-                  <h2 id="quote-contact-modal-title" className="text-xl text-foreground pr-10">
-                    Your details
-                  </h2>
-                  <p className="mt-2 text-sm text-muted leading-relaxed">
-                    Tell us about your roof and how to reach you. We will show your full quote right after.
-                  </p>
-                  {renderGatedContactBody({
-                    roofMaterial: "roof-material-label",
-                    jobType: "job-type-label",
-                    name: "quote-name",
-                    email: "quote-email",
-                    phone: "quote-phone",
-                  })}
-                </section>
-              </div>
-            </div>
-          ) : (
-            <section
-              ref={contactFormRef}
-              id="quote-contact-form"
-              className="mt-8 max-w-[600px] w-full rounded-xl border border-border-subtle bg-surface p-6 md:p-8 scroll-mt-6"
-              aria-labelledby="quote-contact-title"
-            >
-              <h2 id="quote-contact-title" className="text-xl text-foreground">
-                Your details
-              </h2>
-              <p className="mt-2 text-sm text-muted leading-relaxed">
-                Tell us about your roof and how to reach you. We will show your full quote right after.
-              </p>
-              {renderGatedContactBody({
-                roofMaterial: "roof-material-label-inline",
-                jobType: "job-type-label-inline",
-                name: "quote-name-inline",
-                email: "quote-email-inline",
-                phone: "quote-phone-inline",
-              })}
-            </section>
-          )}
-
-          {!contactModalOpen ? (
-            <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-surface/95 backdrop-blur-md p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.15)] md:hidden">
-              <button
-                type="button"
-                onClick={openContactModal}
-                className="w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-semibold text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
-              >
-                Reveal my quote
-              </button>
-            </div>
-          ) : null}
-        </>
       ) : null}
 
       {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
@@ -1014,6 +881,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           Re-run roof analysis
         </Link>
       )}
+
+      </div>
 
     </main>
   );

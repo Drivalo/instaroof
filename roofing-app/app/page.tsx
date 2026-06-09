@@ -8,6 +8,7 @@ import AddressFieldWithCountry, {
   AddressPlaceDetails,
 } from "@/components/address-field-with-country";
 import { hasGoogleMapsKey } from "@/lib/google-maps-script";
+import { STAGE1_ROOF_SIZE_LABEL } from "@/lib/roof-estimate";
 
 type BootstrapData = {
   settings: {
@@ -27,8 +28,13 @@ export default function Home() {
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [placeDetails, setPlaceDetails] = useState<AddressPlaceDetails | null>(null);
   const [placeConfirmed, setPlaceConfirmed] = useState(false);
+  const [instantQuoteVisible, setInstantQuoteVisible] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
+  const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const addressInputRef = useRef<AddressFieldHandle>(null);
+  const previewSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     fetch("/api/public/bootstrap")
@@ -41,6 +47,11 @@ export default function Home() {
 
   const companyName = bootstrap?.settings?.company_name ?? "Nimly";
   const companyLogo = bootstrap?.settings?.company_logo_url;
+
+  useEffect(() => {
+    if (!instantQuoteVisible || !previewSectionRef.current) return;
+    previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [instantQuoteVisible]);
 
   function hasValidCoords(lat?: number, lng?: number) {
     return (
@@ -57,14 +68,60 @@ export default function Home() {
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const primaryCtaEnabled = hasValidAddress && !loadingAnalysis;
+  const primaryCtaEnabled = hasValidAddress && !loadingPreview;
 
   async function handlePrimaryCta() {
     if (!addressInputRef.current?.validateForSubmit()) return;
-    await startRoofAnalysis();
+    await loadInstantEstimate();
   }
 
-  async function startRoofAnalysis() {
+  async function loadInstantEstimate() {
+    if (!addressInputRef.current?.validateForSubmit()) return;
+
+    const details = addressInputRef.current.getPlaceDetails() ?? placeDetails;
+    if (!details || !hasValidCoords(details.latitude, details.longitude)) {
+      return;
+    }
+
+    setInstantQuoteVisible(true);
+    setLoadingPreview(true);
+    setPreviewRoofLabel(null);
+    setPreviewPriceRange(null);
+
+    try {
+      const res = await fetch("/api/leads/preview-estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: details.address,
+          latitude: details.latitude,
+          longitude: details.longitude,
+          country_code: details.countryCode ?? null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not estimate roof size");
+      }
+      setPreviewRoofLabel(data.area?.label ?? `${data.roof_sqft} sq ft`);
+      setPreviewPriceRange(data.price_range ?? null);
+    } catch (err) {
+      console.error("[loadInstantEstimate] preview estimate failed:", err);
+      const message = err instanceof Error ? err.message : "Could not estimate roof size. Please try again.";
+      const isAddressSelectionError =
+        message.toLowerCase().includes("dropdown") || message.toLowerCase().includes("select an address");
+      if (isAddressSelectionError) {
+        addressInputRef.current?.validateForSubmit();
+      } else {
+        alert(message);
+      }
+      setInstantQuoteVisible(false);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  async function startAiAnalysis() {
     if (!addressInputRef.current?.validateForSubmit()) return;
 
     const details = addressInputRef.current.getPlaceDetails() ?? placeDetails;
@@ -110,7 +167,7 @@ export default function Home() {
 
         if (res.ok) {
           if (data.waitlist) {
-            alert("We don't service your area yet — you've been added to the waitlist.");
+            alert("We don't service your area yet. You've been added to the waitlist.");
             return;
           }
           router.push(
@@ -119,7 +176,7 @@ export default function Home() {
           return;
         }
 
-        console.error(`[createRealLead] attempt ${attempt}/${maxAttempts} failed:`, {
+        console.error(`[startAiAnalysis] attempt ${attempt}/${maxAttempts} failed:`, {
           status: res.status,
           error: data.error,
           supabase: data.supabase,
@@ -136,7 +193,7 @@ export default function Home() {
         "We couldn't start your quote right now. Please wait a moment and try again.";
       alert(message);
     } catch (err) {
-      console.error("[createRealLead] network or unexpected error:", err);
+      console.error("[startAiAnalysis] network or unexpected error:", err);
       alert("We couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoadingAnalysis(false);
@@ -145,7 +202,7 @@ export default function Home() {
 
   const defaultTestimonials = useMemo(
     () => [
-      { id: 1, name: "Sarah J.", location: "Austin, TX", quote_text: "Fast and accurate quote — booked in minutes.", rating: 5 },
+      { id: 1, name: "Sarah J.", location: "Austin, TX", quote_text: "Fast and accurate quote. Booked in minutes.", rating: 5 },
       { id: 2, name: "Mike R.", location: "Dallas, TX", quote_text: "Loved seeing the estimate instantly.", rating: 5 },
       { id: 3, name: "Priya K.", location: "Houston, TX", quote_text: "Simple, clear, and straightforward.", rating: 5 },
     ],
@@ -156,7 +213,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background text-foreground font-sans font-normal pb-24">
-      {/* Hero */}
       <section className="pt-14 md:pt-20 pb-16 md:pb-24">
         <div className="container-max">
           {companyLogo ? (
@@ -170,9 +226,7 @@ export default function Home() {
             />
           ) : null}
 
-          <h1 className="hero-headline">
-            Get your quote in 60 seconds
-          </h1>
+          <h1 className="hero-headline">Get your quote in 60 seconds</h1>
           <p className="mt-5 text-lg md:text-xl text-muted max-w-xl leading-relaxed">
             See your price. Decide when you&apos;re ready.
           </p>
@@ -191,7 +245,7 @@ export default function Home() {
                 disabled={!primaryCtaEnabled}
                 className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingAnalysis ? "Starting analysis…" : "Analyse my roof"}
+                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
             </div>
 
@@ -200,12 +254,62 @@ export default function Home() {
                 Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to roofing-app/.env.local and restart the dev server.
               </p>
             )}
-
           </div>
         </div>
       </section>
 
-      {/* How it works */}
+      {instantQuoteVisible && (
+        <section ref={previewSectionRef} className="pb-16 md:pb-20">
+          <div className="container-max">
+            <div className="rounded-lg border border-border-subtle bg-surface p-8 md:p-10">
+              <p className="text-xs uppercase tracking-[0.2em] text-accent">Your estimate</p>
+              <h2 className="text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
+                  <p className="text-sm text-muted">{STAGE1_ROOF_SIZE_LABEL}</p>
+                  <p className="mt-1 text-lg text-foreground">
+                    {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
+                  <p className="text-sm text-muted">Price range</p>
+                  <p className="mt-1 text-xs text-muted">Broad estimate based on typical roof size in your area</p>
+                  <p className="mt-1 text-lg text-foreground">
+                    {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
+                  </p>
+                  <p className="mt-2 text-xs text-muted leading-relaxed">
+                    Refined when we analyse your roof from satellite imagery.
+                  </p>
+                </div>
+              </div>
+
+              {!loadingPreview && previewRoofLabel && previewPriceRange && (
+                <p className="mt-6 text-sm text-muted leading-relaxed">
+                  A regional average for homes in your area, not a measurement of your property. AI satellite
+                  analysis measures your actual roof when you continue.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => void startAiAnalysis()}
+                disabled={
+                  loadingAnalysis ||
+                  loadingPreview ||
+                  !previewRoofLabel ||
+                  !previewPriceRange ||
+                  !hasValidAddress
+                }
+                className="mt-8 btn-accent rounded-lg px-6 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingAnalysis ? "Starting analysis…" : "Refine my quote with AI roof analysis"}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16 md:py-20 border-t border-border-subtle">
         <div className="container-max">
           <h2 className="text-2xl md:text-3xl">How it works</h2>
@@ -227,7 +331,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials */}
       <section className="py-16 md:py-20">
         <div className="container-max">
           <h2 className="text-2xl md:text-3xl">What homeowners say</h2>
@@ -247,7 +350,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
     </main>
   );
 }
