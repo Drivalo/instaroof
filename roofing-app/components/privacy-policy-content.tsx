@@ -103,14 +103,14 @@ export function PrivacyPolicyContent() {
 
       <Section title="Why we collect it">
         <p>
-          We collect this information solely to generate your roof quote and pass your enquiry to a
+          We collect this information solely to generate your roof estimate and pass your enquiry to a
           local roofing professional who can follow up with you.
         </p>
       </Section>
 
       <Section title="Who we share it with">
         <p>
-          Your details are shared only with the roofing business you submitted a quote request
+          Your details are shared only with the roofing business you submitted an estimate request
           through. We do not sell your data to third parties.
         </p>
       </Section>

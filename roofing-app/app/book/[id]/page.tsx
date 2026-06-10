@@ -107,7 +107,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
       <div className="container-max py-8 md:py-12">
         <h1 className="text-2xl md:text-3xl">Book your free inspection</h1>
         <p className="mt-2 text-muted max-w-xl">
-          Choose a time slot and pay your refundable deposit to lock in your quote.
+          Choose a time slot and pay your refundable deposit to lock in your inspection.
         </p>
 
         <div className="mt-8 grid gap-6 md:grid-cols-2">

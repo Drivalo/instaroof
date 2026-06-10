@@ -38,7 +38,7 @@ export function supabaseErrorPayload(error: unknown) {
 
 /** User-facing copy for transient DB/network failures. */
 export const LEAD_CREATE_USER_MESSAGE =
-  "We couldn't start your quote right now. Please wait a moment and tap \"Continue with full AI analysis\" again.";
+  "We couldn't start your estimate right now. Please wait a moment and tap \"Continue with full AI analysis\" again.";
 
 export function isLikelyTransientError(error: unknown): boolean {
   if (!error) return false;

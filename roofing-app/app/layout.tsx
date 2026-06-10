@@ -17,8 +17,8 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
-  title: "Instant Roof Quote",
-  description: "AI-powered instant roofing quotes and booking",
+  title: "Book a Free Roof Inspection",
+  description: "Get an instant roof estimate and connect with a local roofer who confirms the final price on inspection.",
 };
 
 export default function RootLayout({

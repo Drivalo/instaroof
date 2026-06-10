@@ -34,7 +34,7 @@ type LeadRecord = {
   deposit_paid?: boolean | null;
 };
 
-const SUBJECT_QUOTE = "Your roof quote is ready";
+const SUBJECT_QUOTE = "Your roof estimate is ready";
 const SUBJECT_BOOKED = "Your inspection is confirmed";
 const QUOTE_READY_FROM_EMAIL = "hello@nimly.tech";
 
@@ -88,7 +88,7 @@ function formatPriceRange(lead: LeadRecord, settings: SettingsRow): string {
     return previewPriceRangeFromEstimate(sqft, lead.address, settings, lead.country_code);
   }
 
-  return "Available on your quote page";
+  return "Available on your estimate page";
 }
 
 function hasInspectionBooking(lead: LeadRecord): boolean {
@@ -179,10 +179,10 @@ function buildHtml(
   const priceRange = formatPriceRange(lead, settings);
   const companyName = settings.company_name || "your roofing company";
   const booked = hasInspectionBooking(lead);
-  const headline = booked ? "Your inspection is confirmed" : "Your roof quote is ready";
+  const headline = booked ? "Your inspection is confirmed" : "Your roof estimate is ready";
   const intro = booked
     ? `Hi ${firstName}, thank you for booking with ${companyName}. Your free roof inspection is scheduled. Here is a summary of your estimate and appointment details.`
-    : `Hi ${firstName}, thank you for using our instant quote service. Here is a summary of your estimate for <span style="color:#ffffff;">${lead.address}</span>.`;
+    : `Hi ${firstName}, thank you for using our instant estimate service. Here is a summary of your starting estimate for <span style="color:#ffffff;">${lead.address}</span>. Your roofer will confirm the final price on inspection.`;
   const followUp = booked
     ? `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#a0a0a0;">
                 A roofing specialist from ${companyName} will meet you at the property at the scheduled time.
@@ -233,7 +233,7 @@ function buildHtml(
                 </tr>
               </table>
               ${followUp}
-              <a href="${quoteUrl}" style="display:inline-block;background-color:#f5a623;color:#1c1c1c;text-decoration:none;font-size:14px;font-weight:500;padding:14px 24px;border-radius:8px;">View your quote</a>
+              <a href="${quoteUrl}" style="display:inline-block;background-color:#f5a623;color:#1c1c1c;text-decoration:none;font-size:14px;font-weight:500;padding:14px 24px;border-radius:8px;">View your estimate</a>
             </td>
           </tr>
         </table>
@@ -251,7 +251,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
   const companyName = settings.company_name || "your roofing company";
   const booked = hasInspectionBooking(lead);
   const lines: string[] = [
-    booked ? "Your inspection is confirmed" : "Your roof quote is ready",
+    booked ? "Your inspection is confirmed" : "Your roof estimate is ready",
     "",
     `Hi ${firstName},`,
     "",
@@ -286,7 +286,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
     }
   } else {
     lines.push(
-      "Thank you for using our instant quote service.",
+      "Thank you for using our instant estimate service.",
       "",
       `Property: ${lead.address}`,
     );
@@ -310,7 +310,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
     );
   }
 
-  lines.push("", `View your quote: ${quoteUrl}`);
+  lines.push("", `View your estimate: ${quoteUrl}`);
   return lines.join("\n");
 }
 

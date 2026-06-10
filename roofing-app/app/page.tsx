@@ -190,7 +190,7 @@ export default function Home() {
 
       const message =
         lastData?.userMessage ||
-        "We couldn't start your quote right now. Please wait a moment and try again.";
+        "We couldn't start your estimate right now. Please wait a moment and try again.";
       alert(message);
     } catch (err) {
       console.error("[startAiAnalysis] network or unexpected error:", err);
@@ -202,7 +202,7 @@ export default function Home() {
 
   const defaultTestimonials = useMemo(
     () => [
-      { id: 1, name: "Sarah J.", location: "Austin, TX", quote_text: "Fast and accurate quote. Booked in minutes.", rating: 5 },
+      { id: 1, name: "Sarah J.", location: "Austin, TX", quote_text: "Got a quick estimate and booked in minutes.", rating: 5 },
       { id: 2, name: "Mike R.", location: "Dallas, TX", quote_text: "Loved seeing the estimate instantly.", rating: 5 },
       { id: 3, name: "Priya K.", location: "Houston, TX", quote_text: "Simple, clear, and straightforward.", rating: 5 },
     ],
@@ -226,9 +226,9 @@ export default function Home() {
             />
           ) : null}
 
-          <h1 className="hero-headline">Get your quote in 60 seconds</h1>
+          <h1 className="hero-headline">Book a free roof inspection in 60 seconds</h1>
           <p className="mt-5 text-lg md:text-xl text-muted max-w-xl leading-relaxed">
-            See your price. Decide when you&apos;re ready.
+            Get an instant estimate based on your property, then connect with a local roofer who will confirm the final price on site.
           </p>
 
           <div className="mt-10 md:mt-12 max-w-2xl overflow-visible">
@@ -239,13 +239,16 @@ export default function Home() {
                 onPlaceSelected={setPlaceDetails}
                 onPlaceConfirmedChange={setPlaceConfirmed}
               />
+              <p className="text-sm text-muted leading-relaxed">
+                Best suited for standard detached and semi-detached homes. For converted properties or complex buildings, your roofer will refine the estimate on inspection.
+              </p>
               <button
                 type="button"
                 onClick={() => void handlePrimaryCta()}
                 disabled={!primaryCtaEnabled}
                 className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
+                {loadingPreview ? "Estimating…" : "Get My Instant Estimate"}
               </button>
             </div>
 
@@ -263,7 +266,7 @@ export default function Home() {
           <div className="container-max">
             <div className="rounded-lg border border-border-subtle bg-surface p-8 md:p-10">
               <p className="text-xs uppercase tracking-[0.2em] text-accent">Your estimate</p>
-              <h2 className="text-2xl md:text-3xl mt-2">Your Instant Quote</h2>
+              <h2 className="text-2xl md:text-3xl mt-2">Your Instant Estimate</h2>
 
               <div className="mt-8 grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
@@ -287,7 +290,7 @@ export default function Home() {
               {!loadingPreview && previewRoofLabel && previewPriceRange && (
                 <p className="mt-6 text-sm text-muted leading-relaxed">
                   A regional average for homes in your area, not a measurement of your property. AI satellite
-                  analysis measures your actual roof when you continue.
+                  analysis helps refine your starting estimate when you continue.
                 </p>
               )}
 
@@ -303,7 +306,7 @@ export default function Home() {
                 }
                 className="mt-8 btn-accent rounded-lg px-6 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingAnalysis ? "Starting analysis…" : "Refine my quote with AI roof analysis"}
+                {loadingAnalysis ? "Starting analysis…" : "Refine my estimate with AI roof analysis"}
               </button>
             </div>
           </div>
@@ -317,7 +320,7 @@ export default function Home() {
             {[
               { step: "01", text: "Enter your address" },
               { step: "02", text: "We analyse your roof from satellite imagery" },
-              { step: "03", text: "Receive your quote instantly" },
+              { step: "03", text: "Receive your estimate instantly" },
             ].map((item) => (
               <div
                 key={item.step}

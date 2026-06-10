@@ -361,7 +361,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
     if (!id) {
       console.error("[quote] saveContactDetails blocked — lead id not loaded yet");
-      alert("Quote is still loading. Please wait a moment and try again.");
+      alert("Your estimate is still loading. Please wait a moment and try again.");
       return false;
     }
 
@@ -523,7 +523,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     };
   }, [showDetailsModal, showBookingModal]);
 
-  if (!lead) return <main className="customer-page container-max py-10">Loading quote...</main>;
+  if (!lead) return <main className="customer-page container-max py-10">Loading your estimate...</main>;
 
   const depositLabel = formatDepositPrice(
     Number(settings?.deposit_amount ?? 50),
@@ -663,7 +663,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               className="mt-1 h-4 w-4 shrink-0 rounded border-border-subtle bg-background accent-[#F5A623]"
             />
             <span className="text-sm text-muted leading-relaxed">
-              I agree to my personal data being processed to generate and deliver my roof quote.{" "}
+              I agree to my personal data being processed to generate and deliver my roof estimate.{" "}
               <Link href="/privacy" className="text-accent underline-offset-2 hover:underline">
                 View our Privacy Policy
               </Link>
@@ -676,7 +676,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             disabled={!contactReady || savingContact}
             className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {savingContact ? "Saving…" : "Reveal my full quote"}
+            {savingContact ? "Saving…" : "Reveal my full estimate"}
           </button>
         </>
       ) : (
@@ -723,7 +723,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                       </div>
                     </div>
                     <p className="mt-2 text-sm text-center text-muted leading-relaxed">
-                      Enter your details to reveal your full quote
+                      Enter your details to reveal your full estimate
                     </p>
                   </div>
                 ) : null}
@@ -752,7 +752,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               Book your free inspection
             </h2>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Choose a time slot and pay your refundable deposit to lock in your quote.
+              Choose a time slot and pay your refundable deposit to lock in your inspection.
             </p>
             <p className="mt-4 text-sm text-muted">
               Refundable deposit: <span className="text-foreground">{depositLabel}</span>
@@ -788,14 +788,14 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       <div className={showDetailsModal ? "pointer-events-none select-none blur-sm" : undefined}>
       {hasQuoteEstimates ? (
         <h1 className="text-2xl md:text-3xl text-foreground mt-6 max-w-[600px]">
-          {detailsUnlocked ? "Your quote" : "Your roof has been analysed"}
+          {detailsUnlocked ? "Your estimate" : "Your roof has been analysed"}
         </h1>
       ) : null}
 
       {detailsUnlocked && lead?.vision_roof_visible !== false && settings && hasRoofSqft ? (
         <section className="mt-4 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
           <h2 id="quote-revealed-title" className="text-lg text-foreground">
-            Your full quote
+            Your full estimate
           </h2>
           {materialNotSure ? (
             <div className="mt-4">
@@ -901,7 +901,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       {lead.vision_confidence != null && Number(lead.vision_confidence) < 50 && (
         <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 max-w-[600px]">
-          Your roof has complex features - your final quote may vary significantly from this estimate.
+          Your roof has complex features. Your roofer may adjust this starting estimate significantly after inspection.
         </p>
       )}
 
@@ -923,7 +923,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       {hasQuoteEstimates ? (
         <p className="mt-3 text-sm text-muted max-w-[600px]">
-          Estimate based on AI satellite analysis.
+          Starting estimate based on AI satellite analysis. Your roofer will confirm the final price on inspection.
         </p>
       ) : null}
 
