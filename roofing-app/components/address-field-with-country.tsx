@@ -42,6 +42,8 @@ type AddressFieldWithCountryProps = {
   onPlaceSelected?: (details: AddressPlaceDetails | null) => void;
   /** Fired when the user confirms the selected address with "Yes, that's correct". */
   onPlaceConfirmedChange?: (confirmed: boolean) => void;
+  /** Fired when the country dropdown selection changes (including geo-detected default). */
+  onCountryChange?: (countryCode: SupportedCountryCode) => void;
   className?: string;
 };
 
@@ -60,7 +62,7 @@ function isValidPlaceDetails(details: AddressPlaceDetails | null): details is Ad
 
 const AddressFieldWithCountry = forwardRef<AddressFieldHandle, AddressFieldWithCountryProps>(
   function AddressFieldWithCountry(
-    { onAddressChange, onPlaceSelected, onPlaceConfirmedChange, className = "" },
+    { onAddressChange, onPlaceSelected, onPlaceConfirmedChange, onCountryChange, className = "" },
     ref,
   ) {
     const [countryCode, setCountryCode] = useState<SupportedCountryCode>("us");
@@ -178,6 +180,10 @@ const AddressFieldWithCountry = forwardRef<AddressFieldHandle, AddressFieldWithC
         cancelled = true;
       };
     }, []);
+
+    useEffect(() => {
+      onCountryChange?.(countryCode);
+    }, [countryCode, onCountryChange]);
 
     useEffect(() => {
       if (!menuOpen) return;

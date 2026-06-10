@@ -9,6 +9,7 @@ import AddressFieldWithCountry, {
 } from "@/components/address-field-with-country";
 import { hasGoogleMapsKey } from "@/lib/google-maps-script";
 import { STAGE1_ROOF_SIZE_LABEL } from "@/lib/roof-estimate";
+import type { SupportedCountryCode } from "@/lib/supported-countries";
 
 type BootstrapData = {
   settings: {
@@ -33,6 +34,7 @@ export default function Home() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<SupportedCountryCode>("us");
   const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -238,6 +240,10 @@ export default function Home() {
                 className="w-full"
                 onPlaceSelected={setPlaceDetails}
                 onPlaceConfirmedChange={setPlaceConfirmed}
+                onCountryChange={(countryCode) => {
+                  console.log("[page] onCountryChange", countryCode);
+                  setSelectedCountry(countryCode);
+                }}
               />
               <button
                 type="button"
@@ -248,7 +254,7 @@ export default function Home() {
                 {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
               <p className="text-sm text-muted leading-relaxed">
-                {placeDetails?.countryCode === "GB"
+                {selectedCountry === "gb"
                   ? "Best suited for terraced and semi-detached homes. For larger or more complex properties, your roofer will confirm the accurate measurement on inspection."
                   : "Best suited for standard residential properties. For larger or more complex properties, your roofer will confirm the accurate measurement on inspection."}
               </p>
