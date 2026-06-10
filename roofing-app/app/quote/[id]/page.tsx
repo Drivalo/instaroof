@@ -921,6 +921,28 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
+      {showBookInspectionCta && (
+        <section
+          className="mt-6 w-full max-w-[600px] scroll-mt-6"
+          aria-labelledby="quote-booking-cta-title"
+        >
+          <h2 id="quote-booking-cta-title" className="sr-only">
+            Book your inspection
+          </h2>
+          <a
+            href={bookingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
+          >
+            Book my free inspection
+          </a>
+          <p className="mt-3 text-center text-sm text-muted">
+            Final price confirmed on site. No obligation.
+          </p>
+        </section>
+      )}
+
       {hasQuoteEstimates ? (
         <p className="mt-3 text-sm text-muted max-w-[600px]">
           Starting estimate based on AI satellite analysis. Your roofer will confirm the final price on inspection.
