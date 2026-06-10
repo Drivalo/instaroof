@@ -1,0 +1,128 @@
+[1mdiff --git a/roofing-app/app/api/leads/[id]/analyze/route.ts b/roofing-app/app/api/leads/[id]/analyze/route.ts[m
+[1mindex 62428d8..7a6c546 100644[m
+[1m--- a/roofing-app/app/api/leads/[id]/analyze/route.ts[m
+[1m+++ b/roofing-app/app/api/leads/[id]/analyze/route.ts[m
+[36m@@ -8,7 +8,12 @@[m [mimport {[m
+   SATELLITE_STATIC_ZOOM,[m
+   satelliteImageSrcForLead,[m
+ } from "@/lib/maps-static";[m
+[31m-import { formatRoofAreaDisplay } from "@/lib/roof-estimate";[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  formatRoofAreaDisplay,[m
+[32m+[m[32m  estimateStage1RoofSqftFromCountry,[m
+[32m+[m[32m  stage1CountryRegion,[m
+[32m+[m[32m  stage1MedianRoofSqm,[m
+[32m+[m[32m} from "@/lib/roof-estimate";[m
+ import { calcQuoteRanges } from "@/lib/quote";[m
+ import { getSettings, getSupabaseAdmin } from "@/lib/supabase";[m
+ import {[m
+[36m@@ -159,20 +164,73 @@[m [mexport async function POST(req: NextRequest, { params }: { params: Promise<{ id:[m
+       }[m
+     }[m
+ [m
+[32m+[m[32m    const roofAreaSqm =[m
+[32m+[m[32m      analysis.roof_area_sqm != null && Number.isFinite(analysis.roof_area_sqm)[m
+[32m+[m[32m        ? analysis.roof_area_sqm[m
+[32m+[m[32m        : null;[m
+[32m+[m
+[32m+[m[32m    const stage1Region = stage1CountryRegion(lead.country_code, lead.address);[m
+[32m+[m[32m    const stage1MedianSqm = stage1MedianRoofSqm(lead.country_code, lead.address);[m
+[32m+[m
+[32m+[m[32m    console.log("[vision/analyze] raw GPT-4o roof_area_sqm (before conversion):", roofAreaSqm);[m
+[32m+[m
+[32m+[m[32m    let storedRoofSqft: number;[m
+[32m+[m[32m    let roofSqftSource: "gpt4o_roof_area_sqm" | "stage1_country_median_fallback";[m
+[32m+[m
+[32m+[m[32m    if (roofAreaSqm != null && roofAreaSqm > 0) {[m
+[32m+[m[32m      storedRoofSqft = Math.max(500, Math.round(roofAreaSqm * 10.7639));[m
+[32m+[m[32m      roofSqftSource = "gpt4o_roof_area_sqm";[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      storedRoofSqft = estimateStage1RoofSqftFromCountry(lead.country_code, lead.address);[m
+[32m+[m[32m      roofSqftSource = "stage1_country_median_fallback";[m
+[32m+[m[32m      console.warn([m
+[32m+[m[32m        `[vision/analyze] lead ${leadId} roof_area_sqm missing or invalid — falling back to country-specific Stage 1 median`,[m
+[32m+[m[32m        {[m
+[32m+[m[32m          country_code: lead.country_code ?? null,[m
+[32m+[m[32m          stage1_region: stage1Region,[m
+[32m+[m[32m          stage1_median_sqm: stage1MedianSqm,[m
+[32m+[m[32m          roof_area_sqm: roofAreaSqm,[m
+[32m+[m[32m          stored_roof_sqft: storedRoofSqft,[m
+[32m+[m[32m        },[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (!Number.isFinite(storedRoofSqft) || storedRoofSqft <= 0) {[m
+[32m+[m[32m      storedRoofSqft = estimateStage1RoofSqftFromCountry(lead.country_code, lead.address);[m
+[32m+[m[32m      roofSqftSource = "stage1_country_median_fallback";[m
+[32m+[m[32m      console.warn(`[vision/analyze] lead ${leadId} storedRoofSqft invalid after conversion — using Stage 1 median`, {[m
+[32m+[m[32m        country_code: lead.country_code ?? null,[m
+[32m+[m[32m        stage1_region: stage1Region,[m
+[32m+[m[32m        stage1_median_sqm: stage1MedianSqm,[m
+[32m+[m[32m        stored_roof_sqft: storedRoofSqft,[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    console.info(`[vision/analyze] lead ${leadId} roof_sqft storage path`, {[m
+[32m+[m[32m      path: roofSqftSource,[m
+[32m+[m[32m      country_code: lead.country_code ?? null,[m
+[32m+[m[32m      stage1_region: stage1Region,[m
+[32m+[m[32m      stage1_median_sqm: stage1MedianSqm,[m
+[32m+[m[32m      gpt4o_roof_area_sqm: roofAreaSqm,[m
+[32m+[m[32m      stored_roof_sqft: storedRoofSqft,[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    console.log("[vision/analyze] roof_sqft (after conversion × 10.7639):", storedRoofSqft);[m
+[32m+[m
+     const areaDisplay = formatRoofAreaDisplay([m
+[31m-      analysis.roof_sqft,[m
+[32m+[m[32m      storedRoofSqft,[m
+       lead.address,[m
+       lead.country_code,[m
+     );[m
+[31m-    const fallbackSqm =[m
+[31m-      "roof_area_sqm" in analysis && typeof (analysis as { roof_area_sqm?: number }).roof_area_sqm === "number"[m
+[31m-        ? (analysis as { roof_area_sqm: number }).roof_area_sqm[m
+[31m-        : null;[m
+ [m
+     console.info(`[vision/analyze] lead ${leadId} analysis done`, {[m
+       source: analysisSource,[m
+[31m-      roof_sqft_stored_internal: analysis.roof_sqft,[m
+[31m-      roof_area_sqm_from_fallback_or_uk: fallbackSqm,[m
+[32m+[m[32m      roof_sqft_storage_path: roofSqftSource,[m
+[32m+[m[32m      country_code: lead.country_code ?? null,[m
+[32m+[m[32m      stage1_region: stage1Region,[m
+[32m+[m[32m      stage1_median_sqm: stage1MedianSqm,[m
+[32m+[m[32m      roof_sqft_stored_internal: storedRoofSqft,[m
+[32m+[m[32m      roof_area_sqm_from_analysis: roofAreaSqm,[m
+       roof_type: analysis.roof_type,[m
+       confidence: analysis.confidence,[m
+       customer_display_label: areaDisplay.label,[m
+[36m@@ -182,21 +240,23 @@[m [mexport async function POST(req: NextRequest, { params }: { params: Promise<{ id:[m
+     console.info(`[vision/analyze] lead ${leadId} raw vision payload (pre-save)`, {[m
+       analysis,[m
+     });[m
+[31m-    const quotes = calcQuoteRanges(analysis.roof_sqft, analysis.roof_type, settings);[m
+[31m-[m
+[31m-    console.log("[vision/analyze] raw GPT-4o roof_area_sqm:", (analysis as { roof_area_sqm?: unknown }).roof_area_sqm);[m
+[32m+[m[32m    const quotes = calcQuoteRanges(storedRoofSqft, analysis.roof_type, settings);[m
+ [m
+     const { data: updated, error: updateError } = await supabase[m
+       .from("leads")[m
+       .update({[m
+[31m-        roof_sqft: analysis.roof_sqft,[m
+[32m+[m[32m        roof_sqft: storedRoofSqft,[m
+         roof_type: analysis.roof_type,[m
+         roof_complexity: analysis.complexity,[m
+         vision_confidence: analysis.confidence,[m
+         vision_roof_visible: analysis.roof_visible,[m
+         vision_fallback_reason: analysis.fallback_reason,[m
+         polygon_coordinates: analysis.polygon_coordinates,[m
+[31m-        vision_analysis_raw: JSON.stringify({ ...analysis, analysis_source: analysisSource }),[m
+[32m+[m[32m        vision_analysis_raw: JSON.stringify({[m
+[32m+[m[32m          ...analysis,[m
+[32m+[m[32m          roof_sqft: storedRoofSqft,[m
+[32m+[m[32m          analysis_source: analysisSource,[m
+[32m+[m[32m        }),[m
+         ...quotes,[m
+         status: "quoted",[m
+       })[m
