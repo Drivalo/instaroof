@@ -331,7 +331,7 @@ export default function Home() {
 
               {isGbFlow && !loadingPreview && previewRoofLabel && previewPriceRange && (
                 <div className="mt-6 space-y-2">
-                  <p className="text-sm text-muted">What type of property is this?</p>
+                  <p className="text-base text-foreground font-medium">What type of property is this?</p>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {UK_PROPERTY_TYPES.map((option) => (
                       <button
