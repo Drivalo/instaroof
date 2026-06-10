@@ -141,8 +141,6 @@ function buildVisionUserPrompt(
   countryCode: string | null | undefined,
   tileSpanMetres?: number,
 ): string {
-  const country = normalizeVisionCountry(countryCode);
-  const guidance = countryRoofSizeGuidance(countryCode);
   const scaleReference =
     tileSpanMetres != null
       ? `\n\nThe satellite tile covers approximately ${tileSpanMetres} metres across — use this as a scale reference when estimating roof area.`
@@ -150,8 +148,6 @@ function buildVisionUserPrompt(
   return `Estimate the total roof surface area in square metres from this map tile.
 
 CRITICAL: Measure ONLY the roof of the single residential property at the centre of the image. Do not include neighbouring roofs, the full building footprint on multiple lots, gardens, roads, or the entire satellite tile.
-
-Regional context (${country}): ${guidance}
 
 If your estimate exceeds 400 sqm for a single residential property, you are likely measuring too large an area. Remeasure focusing only on the central property's roof.
 
