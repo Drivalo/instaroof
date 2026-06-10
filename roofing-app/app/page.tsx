@@ -87,27 +87,24 @@ export default function Home() {
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const primaryCtaEnabled = hasValidAddress && !loadingPreview;
+  const primaryCtaEnabled =
+    hasValidAddress &&
+    !loadingPreview &&
+    (selectedCountry !== "gb" || propertyType !== "");
 
-  const isGbFlow = useMemo(() => {
-    const fromPlace = placeDetails?.countryCode?.trim().toUpperCase();
-    if (fromPlace === "GB" || fromPlace === "UK") return true;
-    return selectedCountry === "gb";
-  }, [placeDetails?.countryCode, selectedCountry]);
-
-  const propertyTypeRequired = isGbFlow;
+  const propertyTypeRequired = selectedCountry === "gb";
   const propertyTypeComplete = !propertyTypeRequired || propertyType !== "";
 
   const displayPreviewRoofLabel = useMemo(() => {
     if (loadingPreview || !previewRoofLabel) return previewRoofLabel;
-    if (!isGbFlow || !propertyType) return previewRoofLabel;
+    if (selectedCountry !== "gb" || !propertyType) return previewRoofLabel;
     const sqm = UK_PROPERTY_TYPE_SQM[propertyType];
     return `${sqm.toLocaleString("en-US")} m²`;
-  }, [loadingPreview, previewRoofLabel, isGbFlow, propertyType]);
+  }, [loadingPreview, previewRoofLabel, selectedCountry, propertyType]);
 
   const displayPreviewPriceRange = useMemo(() => {
     if (loadingPreview || !previewPriceRange) return previewPriceRange;
-    if (!isGbFlow || !propertyType) return previewPriceRange;
+    if (selectedCountry !== "gb" || !propertyType) return previewPriceRange;
     const sqm = UK_PROPERTY_TYPE_SQM[propertyType];
     const roofSqft = Math.round(sqm / SQFT_PER_SQM);
     const address = placeDetails?.address ?? "";
@@ -116,7 +113,7 @@ export default function Home() {
   }, [
     loadingPreview,
     previewPriceRange,
-    isGbFlow,
+    selectedCountry,
     propertyType,
     placeDetails?.address,
     placeDetails?.countryCode,
@@ -306,6 +303,25 @@ export default function Home() {
                   }
                 }}
               />
+              {selectedCountry === "gb" && (
+                <div className="space-y-2">
+                  <p className="text-base text-foreground font-medium">What type of property is this?</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {UK_PROPERTY_TYPES.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setPropertyType(option)}
+                        className={
+                          propertyType === option ? propertyChoiceSelected : propertyChoiceBase
+                        }
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => void handlePrimaryCta()}
@@ -361,26 +377,6 @@ export default function Home() {
                   A regional average for homes in your area, not a measurement of your property. AI satellite
                   analysis helps refine your starting estimate when you continue.
                 </p>
-              )}
-
-              {isGbFlow && !loadingPreview && previewRoofLabel && previewPriceRange && (
-                <div className="mt-6 space-y-2">
-                  <p className="text-base text-foreground font-medium">What type of property is this?</p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {UK_PROPERTY_TYPES.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setPropertyType(option)}
-                        className={
-                          propertyType === option ? propertyChoiceSelected : propertyChoiceBase
-                        }
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               )}
 
               <button
