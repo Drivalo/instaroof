@@ -740,11 +740,10 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       {lead?.vision_roof_visible === false ? (
         <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 max-w-[600px] leading-relaxed">
-          <p className="font-medium">We couldn&apos;t get a clear satellite view of this property</p>
-          {lead.vision_fallback_reason?.trim() ? (
-            <p className="mt-2">{lead.vision_fallback_reason}</p>
-          ) : null}
-          <p className="mt-2">Fill in your details in the popup to get in touch and book a free inspection.</p>
+          <p>
+            We were unable to generate an automated estimate for this property. Book a free inspection
+            and your roofer will provide a full quote on site.
+          </p>
         </div>
       ) : null}
 
