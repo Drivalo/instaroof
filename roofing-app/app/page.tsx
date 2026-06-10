@@ -248,7 +248,9 @@ export default function Home() {
                 {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
               <p className="text-sm text-muted leading-relaxed">
-                Best suited for standard detached and semi-detached homes. For converted properties or complex buildings, your roofer will refine the estimate on inspection.
+                {placeDetails?.countryCode === "GB"
+                  ? "Best suited for terraced and semi-detached homes. For larger or more complex properties, your roofer will confirm the accurate measurement on inspection."
+                  : "Best suited for standard residential properties. For larger or more complex properties, your roofer will confirm the accurate measurement on inspection."}
               </p>
             </div>
 
