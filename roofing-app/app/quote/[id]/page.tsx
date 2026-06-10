@@ -482,9 +482,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     if (!satelliteSrc) setSatelliteReady(true);
   }, [satelliteSrc]);
 
-  const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL?.trim() ?? "";
   const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
-  const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && bookingUrl.length > 0;
+  const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && Boolean(id);
   const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
 
   const modalPriceRange = useMemo(() => {
@@ -808,14 +807,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 formatRange={formatStandardRange}
               />
               {showBookInspectionCta ? (
-                <a
-                  href={bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={bookInspectionLinkClass}
-                >
+                <Link href={`/book/${id}`} className={bookInspectionLinkClass}>
                   Book my free inspection
-                </a>
+                </Link>
               ) : null}
             </div>
           ) : materialComplete ? (
@@ -826,14 +820,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 formatRange={formatStandardRange}
               />
               {showBookInspectionCta ? (
-                <a
-                  href={bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={bookInspectionLinkClass}
-                >
+                <Link href={`/book/${id}`} className={bookInspectionLinkClass}>
                   Book my free inspection
-                </a>
+                </Link>
               ) : null}
             </div>
           ) : (
@@ -929,14 +918,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
           <h2 id="quote-booking-cta-title" className="sr-only">
             Book your inspection
           </h2>
-          <a
-            href={bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/book/${id}`}
             className="flex w-full items-center justify-center rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
           >
             Book my free inspection
-          </a>
+          </Link>
           <p className="mt-3 text-center text-sm text-muted">
             Final price confirmed on site. No obligation.
           </p>
