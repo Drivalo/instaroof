@@ -7,7 +7,7 @@ export function getGoogleMapsApiKey(override?: string | null): string | undefine
 }
 
 /** Zoom for Static Maps — 21 often returns blank grey tiles where aerial imagery is unavailable. */
-export const SATELLITE_STATIC_ZOOM = 19;
+export const SATELLITE_STATIC_ZOOM = 20;
 
 export function maskGoogleMapsKeyInUrl(url: string) {
   return url.replace(/key=[^&]+/, "key=***");
