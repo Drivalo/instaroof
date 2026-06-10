@@ -192,6 +192,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         adjusted_sqm: roofAreaSqm,
         property_type: propertyType,
       });
+    } else if (
+      countryCode === "AU" &&
+      propertyType.toLowerCase() === "acreage/large home" &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.5;
+      console.info("[vision/analyze] AU large home multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
+      });
     }
 
     const stage1Region = stage1CountryRegion(lead.country_code, lead.address);
