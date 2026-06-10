@@ -32,12 +32,28 @@ async function sendBookingConfirmationEmails(
     req.headers.get("origin")?.trim() ||
     "http://localhost:3000";
 
-  console.info("[bookings/confirm] ATTEMPTING sendCustomerBookingConfirmedEmail", {
+  const leadEmailRaw = lead.email ?? null;
+  const leadEmailTrimmed = String(lead.email ?? "").trim();
+  const hasLeadEmail = leadEmailTrimmed.length > 0;
+  const preloadedLead = mapRowToLeadRecord({
+    ...lead,
+    deposit_paid: false,
+    inspection_datetime: inspectionIsoFinal,
+  });
+  const toAddress = preloadedLead.email?.trim() || leadEmailTrimmed || null;
+  const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "hello@nimly.tech";
+
+  console.info("[bookings/confirm] direct booking customer email — pre-send", {
     leadId: confirmLeadId,
+    hasLeadEmail,
+    leadEmailRaw,
+    leadEmailTrimmed: leadEmailTrimmed || null,
+    preloadedLeadEmail: preloadedLead.email ?? null,
+    toAddress,
+    fromAddress,
+    hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
     appBaseUrl,
     inspectionDatetimePassed: inspectionIsoFinal,
-    customerEmail: lead.email ?? null,
-    hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
   });
 
   const customerEmailResult = await sendCustomerBookingConfirmedEmail(
@@ -45,21 +61,34 @@ async function sendBookingConfirmationEmails(
     appBaseUrl,
     {
       inspectionDatetime: inspectionIsoFinal,
-      preloadedLead: mapRowToLeadRecord({
-        ...lead,
-        deposit_paid: false,
-        inspection_datetime: inspectionIsoFinal,
-      }),
+      preloadedLead,
     },
   );
 
-  console.info("[bookings/confirm] customer email result", {
-    leadId: confirmLeadId,
-    sent: customerEmailResult.sent,
-    skipped: customerEmailResult.skipped ?? false,
-    reason: customerEmailResult.reason ?? null,
-    messageId: customerEmailResult.messageId ?? null,
-  });
+  if (customerEmailResult.sent) {
+    console.info("[bookings/confirm] direct booking customer email — sent", {
+      leadId: confirmLeadId,
+      toAddress,
+      fromAddress,
+      messageId: customerEmailResult.messageId ?? null,
+    });
+  } else {
+    console.error("[bookings/confirm] direct booking customer email — FAILED", {
+      leadId: confirmLeadId,
+      hasLeadEmail,
+      leadEmailRaw,
+      leadEmailTrimmed: leadEmailTrimmed || null,
+      preloadedLeadEmail: preloadedLead.email ?? null,
+      toAddress,
+      fromAddress,
+      hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
+      sent: customerEmailResult.sent,
+      skipped: customerEmailResult.skipped ?? false,
+      reason: customerEmailResult.reason ?? null,
+      fullEmailResult: customerEmailResult,
+      resendErrorResponse: customerEmailResult.reason ?? null,
+    });
+  }
 
   console.info("[bookings/confirm] sending BO booking notification email", {
     leadId: confirmLeadId,

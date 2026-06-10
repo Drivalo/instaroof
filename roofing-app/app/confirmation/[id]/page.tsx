@@ -27,6 +27,13 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     const emailPreviouslyDone =
       typeof window !== "undefined" && sessionStorage.getItem(emailStorageKey) === "done";
 
+    console.log("[confirmation-page] useEffect start", {
+      leadId,
+      sessionId,
+      hasCachedAppointment: Boolean(cached),
+      emailPreviouslyDone,
+    });
+
     let cachedAppointment: AppointmentDetails | null = null;
     if (cached) {
       try {
@@ -54,7 +61,7 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
         }
       }
 
-      console.info("[confirmation-page] calling /api/bookings/confirm", {
+      console.log("[confirmation-page] about to POST /api/bookings/confirm (stripe)", {
         leadId,
         sessionId,
         previouslyDone,
@@ -67,7 +74,7 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
       })
         .then(async (res) => {
           const data = await res.json();
-          console.info("[confirmation-page] confirm response", {
+          console.log("[confirmation-page] POST /api/bookings/confirm response (stripe)", {
             ok: res.ok,
             status: res.status,
             data,
@@ -105,18 +112,27 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     }
 
     if (!cachedAppointment) {
+      console.log("[confirmation-page] skipped POST /api/bookings/confirm — no cached appointment in sessionStorage", {
+        leadId,
+        storageKey,
+      });
       setStatus("error");
       setError("No booking found. Please complete the booking form first.");
       return;
     }
 
     if (emailPreviouslyDone) {
+      console.log("[confirmation-page] skipped POST /api/bookings/confirm — booking-email-done already set", {
+        leadId,
+        emailStorageKey,
+      });
       setStatus("success");
       return;
     }
 
-    console.info("[confirmation-page] calling /api/bookings/confirm (direct booking)", {
+    console.log("[confirmation-page] about to POST /api/bookings/confirm (direct booking)", {
       leadId,
+      body: { leadId },
     });
 
     fetch("/api/bookings/confirm", {
@@ -126,7 +142,7 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     })
       .then(async (res) => {
         const data = await res.json();
-        console.info("[confirmation-page] direct confirm response", {
+        console.log("[confirmation-page] POST /api/bookings/confirm response (direct booking)", {
           ok: res.ok,
           status: res.status,
           data,
