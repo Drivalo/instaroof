@@ -239,9 +239,6 @@ export default function Home() {
                 onPlaceSelected={setPlaceDetails}
                 onPlaceConfirmedChange={setPlaceConfirmed}
               />
-              <p className="text-sm text-muted leading-relaxed">
-                Best suited for standard detached and semi-detached homes. For converted properties or complex buildings, your roofer will refine the estimate on inspection.
-              </p>
               <button
                 type="button"
                 onClick={() => void handlePrimaryCta()}
@@ -250,6 +247,9 @@ export default function Home() {
               >
                 {loadingPreview ? "Estimating…" : "Get My Instant Estimate"}
               </button>
+              <p className="text-sm text-muted leading-relaxed">
+                Best suited for standard detached and semi-detached homes. For converted properties or complex buildings, your roofer will refine the estimate on inspection.
+              </p>
             </div>
 
             {!hasGoogleMapsKey() && (
