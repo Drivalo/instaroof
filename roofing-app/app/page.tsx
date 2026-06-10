@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AddressFieldWithCountry, {
   AddressFieldHandle,
@@ -89,6 +89,8 @@ export default function Home() {
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<SupportedCountryCode>("us");
   const [propertyType, setPropertyType] = useState("");
+  const selectedCountryRef = useRef<SupportedCountryCode>(selectedCountry);
+  selectedCountryRef.current = selectedCountry;
   const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -312,6 +314,14 @@ export default function Home() {
   );
 
   const testimonials = bootstrap?.testimonials?.length ? bootstrap.testimonials : defaultTestimonials;
+
+  const handleCountryChange = useCallback((countryCode: SupportedCountryCode) => {
+    console.log("[page] onCountryChange", countryCode);
+    if (selectedCountryRef.current !== countryCode) {
+      setPropertyType("");
+    }
+    setSelectedCountry(countryCode);
+  }, []);
 
   return (
     <main className="min-h-screen bg-background text-foreground font-sans font-normal pb-24">
