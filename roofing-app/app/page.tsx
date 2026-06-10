@@ -119,9 +119,11 @@ export default function Home() {
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const primaryCtaEnabled = hasValidAddress && !loadingPreview && propertyType !== "";
+  const propertyTypeComplete = COUNTRY_PROPERTY_TYPE_OPTIONS[selectedCountry].some(
+    (entry) => entry.label === propertyType,
+  );
 
-  const propertyTypeComplete = propertyType !== "";
+  const primaryCtaEnabled = hasValidAddress && !loadingPreview && propertyTypeComplete;
 
   const countryPropertyTypeOptions = COUNTRY_PROPERTY_TYPE_OPTIONS[selectedCountry];
 
@@ -351,7 +353,13 @@ export default function Home() {
                     <button
                       key={option.label}
                       type="button"
-                      onClick={() => setPropertyType(option.label)}
+                      onClick={() => {
+                        console.log("[page] property type click", {
+                          country: selectedCountry,
+                          label: option.label,
+                        });
+                        setPropertyType(option.label);
+                      }}
                       className={
                         propertyType === option.label ? propertyChoiceSelected : propertyChoiceBase
                       }
