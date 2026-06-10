@@ -169,17 +169,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         ? analysis.roof_area_sqm
         : null;
 
+    const { data: leadPropertyFields } = await supabase
+      .from("leads")
+      .select("property_type, country_code")
+      .eq("id", leadId)
+      .single();
+
+    const countryCode = String(leadPropertyFields?.country_code ?? "").trim().toUpperCase();
+    const propertyType = String(leadPropertyFields?.property_type ?? "").trim();
+
     let roofAreaSqm = roofAreaSqmRaw;
-    const isGbLead = String(lead.country_code ?? "").trim().toUpperCase() === "GB";
-    if (isGbLead && roofAreaSqmRaw != null && roofAreaSqmRaw > 0) {
-      const propertyType = String(lead.property_type ?? "").trim().toLowerCase();
-      const gbPropertyMultiplier = propertyType === "detached" ? 1.5 : 1.0;
-      roofAreaSqm = roofAreaSqmRaw * gbPropertyMultiplier;
-      console.info(`[vision/analyze] lead ${leadId} GB property_type roof_area_sqm multiplier`, {
-        property_type: lead.property_type ?? null,
-        multiplier: gbPropertyMultiplier,
-        roof_area_sqm_before: roofAreaSqmRaw,
-        roof_area_sqm_after: roofAreaSqm,
+    if (
+      countryCode === "GB" &&
+      propertyType.toLowerCase() === "detached" &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.5;
+      console.info("[vision/analyze] UK detached multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
       });
     }
 
