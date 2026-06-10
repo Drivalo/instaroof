@@ -115,7 +115,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                 max={maxDate}
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
-                className={contactFieldClass}
+                className={`${contactFieldClass} [&::-webkit-calendar-picker-indicator]:invert`}
               />
             </div>
 
