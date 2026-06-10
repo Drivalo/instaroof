@@ -8,8 +8,57 @@ import AddressFieldWithCountry, {
   AddressPlaceDetails,
 } from "@/components/address-field-with-country";
 import { hasGoogleMapsKey } from "@/lib/google-maps-script";
-import { STAGE1_ROOF_SIZE_LABEL, previewPriceRangeFromEstimate } from "@/lib/roof-estimate";
+import { STAGE1_ROOF_SIZE_LABEL, formatRoofAreaDisplay, previewPriceRangeFromEstimate } from "@/lib/roof-estimate";
 import type { SupportedCountryCode } from "@/lib/supported-countries";
+
+type PropertyTypeOption = { label: string; sqm: number };
+
+const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly PropertyTypeOption[]> = {
+  gb: [
+    { label: "Terraced", sqm: 70 },
+    { label: "Semi-detached", sqm: 90 },
+    { label: "Detached", sqm: 150 },
+  ],
+  au: [
+    { label: "Townhouse", sqm: 110 },
+    { label: "House", sqm: 160 },
+    { label: "Acreage/Large home", sqm: 220 },
+  ],
+  nz: [
+    { label: "Townhouse", sqm: 100 },
+    { label: "House", sqm: 150 },
+    { label: "Large home", sqm: 200 },
+  ],
+  us: [
+    { label: "Townhouse", sqm: 130 },
+    { label: "House", sqm: 185 },
+    { label: "Large home", sqm: 280 },
+  ],
+  ca: [
+    { label: "Townhouse", sqm: 120 },
+    { label: "House", sqm: 175 },
+    { label: "Large home", sqm: 260 },
+  ],
+};
+
+/** Matches formatRoofAreaDisplay in lib/roof-estimate.ts */
+const SQFT_PER_SQM = 0.092903;
+
+function propertyTypeSqm(country: SupportedCountryCode, propertyType: string): number | null {
+  const option = COUNTRY_PROPERTY_TYPE_OPTIONS[country].find((entry) => entry.label === propertyType);
+  return option?.sqm ?? null;
+}
+
+function stage1LabelFromPropertySqm(
+  sqm: number,
+  country: SupportedCountryCode,
+  address: string,
+  countryCodeFromPlace?: string | null,
+): string {
+  const roofSqft = Math.round(sqm / SQFT_PER_SQM);
+  const countryCode = countryCodeFromPlace ?? country.toUpperCase();
+  return formatRoofAreaDisplay(roofSqft, address, countryCode).label;
+}
 
 type BootstrapData = {
   settings: {
@@ -23,18 +72,6 @@ type BootstrapData = {
   };
   testimonials: Array<{ id: number; name: string; location: string; quote_text: string; rating: number }>;
 };
-
-const UK_PROPERTY_TYPES = ["Terraced", "Semi-detached", "Detached"] as const;
-type UkPropertyType = (typeof UK_PROPERTY_TYPES)[number];
-
-const UK_PROPERTY_TYPE_SQM: Record<UkPropertyType, number> = {
-  Terraced: 70,
-  "Semi-detached": 90,
-  Detached: 150,
-};
-
-/** Matches formatRoofAreaDisplay in lib/roof-estimate.ts */
-const SQFT_PER_SQM = 0.092903;
 
 const propertyChoiceBase =
   "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
@@ -51,7 +88,7 @@ export default function Home() {
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<SupportedCountryCode>("us");
-  const [propertyType, setPropertyType] = useState<UkPropertyType | "">("");
+  const [propertyType, setPropertyType] = useState("");
   const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -82,28 +119,33 @@ export default function Home() {
     placeDetails != null &&
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
-  const primaryCtaEnabled =
-    hasValidAddress &&
-    !loadingPreview &&
-    (selectedCountry !== "gb" || propertyType !== "");
+  const primaryCtaEnabled = hasValidAddress && !loadingPreview && propertyType !== "";
 
-  const propertyTypeRequired = selectedCountry === "gb";
-  const propertyTypeComplete = !propertyTypeRequired || propertyType !== "";
+  const propertyTypeComplete = propertyType !== "";
+
+  const countryPropertyTypeOptions = COUNTRY_PROPERTY_TYPE_OPTIONS[selectedCountry];
 
   const displayPreviewRoofLabel = useMemo(() => {
     if (loadingPreview || !previewRoofLabel) return previewRoofLabel;
-    if (selectedCountry !== "gb" || !propertyType) return previewRoofLabel;
-    const sqm = UK_PROPERTY_TYPE_SQM[propertyType];
-    return `${sqm.toLocaleString("en-US")} m²`;
-  }, [loadingPreview, previewRoofLabel, selectedCountry, propertyType]);
+    if (!propertyType) return previewRoofLabel;
+    const sqm = propertyTypeSqm(selectedCountry, propertyType);
+    if (sqm == null) return previewRoofLabel;
+    return stage1LabelFromPropertySqm(
+      sqm,
+      selectedCountry,
+      placeDetails?.address ?? "",
+      placeDetails?.countryCode,
+    );
+  }, [loadingPreview, previewRoofLabel, selectedCountry, propertyType, placeDetails?.address, placeDetails?.countryCode]);
 
   const displayPreviewPriceRange = useMemo(() => {
     if (loadingPreview || !previewPriceRange) return previewPriceRange;
-    if (selectedCountry !== "gb" || !propertyType) return previewPriceRange;
-    const sqm = UK_PROPERTY_TYPE_SQM[propertyType];
+    if (!propertyType) return previewPriceRange;
+    const sqm = propertyTypeSqm(selectedCountry, propertyType);
+    if (sqm == null) return previewPriceRange;
     const roofSqft = Math.round(sqm / SQFT_PER_SQM);
     const address = placeDetails?.address ?? "";
-    const countryCode = placeDetails?.countryCode ?? "GB";
+    const countryCode = placeDetails?.countryCode ?? selectedCountry.toUpperCase();
     return previewPriceRangeFromEstimate(roofSqft, address, bootstrap?.settings ?? null, countryCode);
   }, [
     loadingPreview,
@@ -299,30 +341,26 @@ export default function Home() {
                 onCountryChange={(countryCode) => {
                   console.log("[page] onCountryChange", countryCode);
                   setSelectedCountry(countryCode);
-                  if (countryCode !== "gb") {
-                    setPropertyType("");
-                  }
+                  setPropertyType("");
                 }}
               />
-              {selectedCountry === "gb" && (
-                <div className="space-y-2">
-                  <p className="text-base text-foreground font-medium">What type of property is this?</p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {UK_PROPERTY_TYPES.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setPropertyType(option)}
-                        className={
-                          propertyType === option ? propertyChoiceSelected : propertyChoiceBase
-                        }
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
+              <div className="space-y-2">
+                <p className="text-base text-foreground font-medium">What type of property is this?</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {countryPropertyTypeOptions.map((option) => (
+                    <button
+                      key={option.label}
+                      type="button"
+                      onClick={() => setPropertyType(option.label)}
+                      className={
+                        propertyType === option.label ? propertyChoiceSelected : propertyChoiceBase
+                      }
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
               <button
                 type="button"
                 onClick={() => void handlePrimaryCta()}
