@@ -23,3 +23,24 @@ export function formatInspectionSchedule(iso: string): {
     combined: format(dt, "EEEE, MMMM d, yyyy 'at' h:mm a"),
   };
 }
+
+export type PreferredInspectionTime = "morning" | "afternoon" | "either";
+
+export function isPreferredInspectionTime(value: string): value is PreferredInspectionTime {
+  return value === "morning" || value === "afternoon" || value === "either";
+}
+
+export function preferredInspectionTimeLabel(preference: PreferredInspectionTime): string {
+  if (preference === "morning") return "Morning";
+  if (preference === "afternoon") return "Afternoon";
+  return "Morning or afternoon";
+}
+
+/** Map preferred date + time window to a stored inspection datetime. */
+export function buildPreferredInspectionIso(
+  preferredDate: string,
+  preference: PreferredInspectionTime,
+): string {
+  const hour = preference === "morning" ? 9 : preference === "afternoon" ? 13 : 10;
+  return normalizeInspectionDatetime(`${preferredDate}T${String(hour).padStart(2, "0")}:00:00`);
+}

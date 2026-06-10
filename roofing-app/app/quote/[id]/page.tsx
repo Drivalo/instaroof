@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import Link from "next/link";
-import { addDays, format } from "date-fns";
 import { SatelliteRoofMap } from "@/components/satellite-roof-map";
 import {
   RoofMaterialComparisonTable,
@@ -120,35 +119,6 @@ function formatQuotePriceRange(
   }
 }
 
-function formatDepositPrice(
-  usdDeposit: number,
-  address: string,
-  settings: SettingsRow | null,
-  countryCode?: string | null,
-): string {
-  const currency = detectQuoteCurrency(address, countryCode);
-  const rateGbp = Number(settings?.currency_rate_gbp ?? 0.79);
-  const rateAud = Number(settings?.currency_rate_aud ?? 1.53);
-  const rateNzd = Number(settings?.currency_rate_nzd ?? 1.64);
-  const rateCad = Number(
-    (settings as { currency_rate_cad?: number } | null)?.currency_rate_cad ?? 1.36,
-  );
-  const fmt = (amount: number) => Math.round(amount).toLocaleString("en-US");
-
-  switch (currency) {
-    case "GB":
-      return `£${fmt(usdDeposit * rateGbp)}`;
-    case "AU":
-      return `A$${fmt(usdDeposit * rateAud)}`;
-    case "NZ":
-      return `NZ$${fmt(usdDeposit * rateNzd)}`;
-    case "CA":
-      return `C$${fmt(usdDeposit * rateCad)}`;
-    default:
-      return `$${fmt(usdDeposit)}`;
-  }
-}
-
 function LockIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -177,10 +147,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   const [savingContact, setSavingContact] = useState(false);
   const [satelliteReady, setSatelliteReady] = useState(false);
   const [detailsUnlocked, setDetailsUnlocked] = useState(false);
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
-  const [availability, setAvailability] = useState<any[]>([]);
-  const [inspectionSlot, setInspectionSlot] = useState("");
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [jobType, setJobType] = useState<JobType | "">("");
   const [gutteringChoice, setGutteringChoice] = useState<"yes" | "no" | null>(null);
@@ -205,7 +171,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         const bootstrapData = await bootstrapRes.json();
         if (leadData.lead) setLead(leadData.lead);
         if (bootstrapData.settings) setSettings(bootstrapData.settings);
-        if (bootstrapData.availability) setAvailability(bootstrapData.availability);
       })
       .catch((err) => console.error("quote page load failed:", err));
   }, [id]);
@@ -402,64 +367,12 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  const openBookingModal = useCallback(() => {
-    setBookingModalOpen(true);
-    console.info("[quote] showBookingModal set to true", { source: "button" });
-  }, []);
-
   async function handleRevealQuote() {
     const saved = await saveContactDetails();
     if (saved) {
       console.info("[quote] contact saved — quote revealed");
     } else {
       console.warn("[quote] reveal quote submit failed");
-    }
-  }
-
-  const next14DaysSlots = useMemo(() => {
-    const values: string[] = [];
-    const byDay = new Map<number, any>(availability.map((row) => [Number(row.day_of_week), row]));
-    for (let i = 1; i <= 14; i += 1) {
-      const d = addDays(new Date(), i);
-      const row = byDay.get(d.getDay());
-      if (!row || !Array.isArray(row.time_slots) || !row.time_slots.length) continue;
-      const dayIso = format(d, "yyyy-MM-dd");
-      const blackout = (row.blackout_dates || []).map((x: string) => String(x).slice(0, 10));
-      if (blackout.includes(dayIso)) continue;
-      for (const t of row.time_slots) values.push(`${dayIso}T${t}:00`);
-    }
-    return values;
-  }, [availability]);
-
-  async function startInspectionCheckout() {
-    if (!inspectionSlot) {
-      alert("Please select an inspection time.");
-      return;
-    }
-    setCheckoutLoading(true);
-    try {
-      const res = await fetch("/api/bookings/create-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId: id,
-          name: contact.name.trim(),
-          phone: contact.phone.trim(),
-          email: contact.email.trim(),
-          bestTimeToContact: null,
-          inspectionDateTime: new Date(inspectionSlot).toISOString(),
-        }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error(data.error || "Could not start checkout");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Checkout failed. Please try again.");
-    } finally {
-      setCheckoutLoading(false);
     }
   }
 
@@ -482,7 +395,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
     if (!satelliteSrc) setSatelliteReady(true);
   }, [satelliteSrc]);
 
-  const showBookingModal = bookingModalOpen && detailsUnlocked && hasQuoteEstimates;
   const showBookInspectionCta = detailsUnlocked && hasQuoteEstimates && Boolean(id);
   const showDetailsModal = hasQuoteEstimates && satelliteReady && !detailsUnlocked;
 
@@ -513,23 +425,16 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
   ]);
 
   useEffect(() => {
-    const lockScroll = showDetailsModal || showBookingModal;
+    const lockScroll = showDetailsModal;
     if (!lockScroll) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [showDetailsModal, showBookingModal]);
+  }, [showDetailsModal]);
 
   if (!lead) return <main className="customer-page container-max py-10">Loading your estimate...</main>;
-
-  const depositLabel = formatDepositPrice(
-    Number(settings?.deposit_amount ?? 50),
-    customerAddress,
-    settings,
-    customerCountry,
-  );
 
   const bookInspectionLinkClass =
     "my-8 flex w-full items-center justify-center rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90";
@@ -735,51 +640,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               email: "quote-email",
               phone: "quote-phone",
             })}
-          </div>
-        </div>
-      )}
-
-      {showBookingModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none overflow-y-auto"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="quote-booking-modal-title"
-        >
-          <div className="w-full max-w-lg rounded-xl border border-border-subtle bg-surface p-6 md:p-8 shadow-2xl my-4 pointer-events-auto">
-            <h2 id="quote-booking-modal-title" className="text-xl md:text-2xl text-foreground">
-              Book your free inspection
-            </h2>
-            <p className="mt-2 text-sm text-muted leading-relaxed">
-              Choose a time slot and pay your refundable deposit to lock in your inspection.
-            </p>
-            <p className="mt-4 text-sm text-muted">
-              Refundable deposit: <span className="text-foreground">{depositLabel}</span>
-            </p>
-            <div className="mt-4 grid gap-2 max-h-[280px] overflow-auto pr-1">
-              {next14DaysSlots.length === 0 ? (
-                <p className="text-sm text-muted">No slots available in the next 14 days.</p>
-              ) : (
-                next14DaysSlots.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setInspectionSlot(s)}
-                    className={inspectionSlot === s ? slotButtonSelected : slotButtonBase}
-                  >
-                    {format(new Date(s), "EEE, MMM d 'at' h:mm a")}
-                  </button>
-                ))
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => void startInspectionCheckout()}
-              disabled={!inspectionSlot || checkoutLoading}
-              className="mt-6 w-full rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {checkoutLoading ? "Redirecting…" : "Continue to Stripe Checkout"}
-            </button>
           </div>
         </div>
       )}

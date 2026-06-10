@@ -32,6 +32,7 @@ type LeadRecord = {
   quote_standard_high?: number | null;
   inspection_datetime?: string | null;
   deposit_paid?: boolean | null;
+  best_time_to_contact?: string | null;
 };
 
 const SUBJECT_QUOTE = "Your roof estimate is ready";
@@ -39,7 +40,7 @@ const SUBJECT_BOOKED = "Your inspection is confirmed";
 const QUOTE_READY_FROM_EMAIL = "hello@nimly.tech";
 
 const LEAD_EMAIL_SELECT =
-  "id, name, email, address, country_code, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid";
+  "id, name, email, address, country_code, latitude, longitude, roof_sqft, quote_standard_low, quote_standard_high, inspection_datetime, deposit_paid, best_time_to_contact";
 
 function resolveRoofSqft(lead: LeadRecord): number | null {
   if (lead.roof_sqft != null && Number.isFinite(Number(lead.roof_sqft))) {
@@ -111,6 +112,7 @@ function formatDepositAmount(lead: LeadRecord, settings: SettingsRow): string {
 function appointmentHtml(lead: LeadRecord, settings: SettingsRow): string {
   if (!lead.inspection_datetime) return "";
   const schedule = formatInspectionSchedule(lead.inspection_datetime);
+  const timeDisplay = lead.best_time_to_contact?.trim() || schedule.time;
   const deposit = formatDepositAmount(lead, settings);
   const phone = settings.company_phone?.trim() || "";
   const email = settings.company_email?.trim() || "";
@@ -139,7 +141,7 @@ function appointmentHtml(lead: LeadRecord, settings: SettingsRow): string {
                 <tr>
                   <td style="padding:14px 16px;background-color:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;">
                     <p style="margin:0 0 4px;font-size:12px;color:#a0a0a0;">Time</p>
-                    <p style="margin:0;font-size:16px;font-weight:500;color:#ffffff;">${schedule.time}</p>
+                    <p style="margin:0;font-size:16px;font-weight:500;color:#ffffff;">${timeDisplay}</p>
                   </td>
                 </tr>
                 <tr><td style="height:10px;"></td></tr>
@@ -161,9 +163,13 @@ function appointmentHtml(lead: LeadRecord, settings: SettingsRow): string {
                     : ""
                 }
               </table>
-              <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#a0a0a0;">
+              ${
+                lead.deposit_paid
+                  ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#a0a0a0;">
                 Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.
-              </p>
+              </p>`
+                  : ""
+              }
               <p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#a0a0a0;">
                 Need to reschedule? Contact us at ${contactHtml}.
               </p>`;
@@ -259,18 +265,23 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, quoteUrl: strin
 
   if (booked && lead.inspection_datetime) {
     const schedule = formatInspectionSchedule(lead.inspection_datetime);
+    const timeDisplay = lead.best_time_to_contact?.trim() || schedule.time;
     const deposit = formatDepositAmount(lead, settings);
     lines.push(
       `Your free roof inspection with ${companyName} is scheduled.`,
       "",
       "Your inspection",
       `Date: ${schedule.date}`,
-      `Time: ${schedule.time}`,
+      `Time: ${timeDisplay}`,
       `Address: ${lead.address}`,
       "",
       ...(lead.deposit_paid ? [`Deposit: ${deposit} paid — confirmation received`, ""] : []),
-      `Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.`,
-      "",
+      ...(lead.deposit_paid
+        ? [
+            `Your ${deposit} deposit is fully refundable if you cancel before the inspection or choose not to proceed after the visit.`,
+            "",
+          ]
+        : []),
     );
     const phone = settings.company_phone?.trim();
     const email = settings.company_email?.trim();
@@ -337,6 +348,7 @@ export function mapRowToLeadRecord(row: Record<string, unknown>): LeadRecord {
     quote_standard_high: (row.quote_standard_high as number | null) ?? null,
     inspection_datetime: (row.inspection_datetime as string | null) ?? null,
     deposit_paid: (row.deposit_paid as boolean | null) ?? null,
+    best_time_to_contact: (row.best_time_to_contact as string | null) ?? null,
   };
 }
 

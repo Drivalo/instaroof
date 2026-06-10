@@ -14,27 +14,42 @@ type AppointmentDetails = {
 function ConfirmationContent({ leadId }: { leadId: string }) {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
-  const [status, setStatus] = useState<"loading" | "success" | "error">(
-    sessionId ? "loading" : "error",
-  );
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [appointment, setAppointment] = useState<AppointmentDetails | null>(null);
-  const [error, setError] = useState(
-    sessionId ? "" : "Missing payment session. Please contact us if you were charged.",
-  );
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!sessionId || !leadId) return;
+    if (!leadId) return;
 
-    const storageKey = `booking-confirm:${leadId}:${sessionId}`;
+    const storageKey = `booking-confirmed:${leadId}`;
+    const cached = typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
+
+    if (cached) {
+      try {
+        setAppointment(JSON.parse(cached) as AppointmentDetails);
+        setStatus("success");
+        return;
+      } catch {
+        /* fall through to Stripe confirm or error */
+      }
+    }
+
+    if (!sessionId) {
+      setStatus("error");
+      setError("No booking found. Please complete the booking form first.");
+      return;
+    }
+
+    const stripeStorageKey = `booking-confirm:${leadId}:${sessionId}`;
     const previouslyDone =
-      typeof window !== "undefined" && sessionStorage.getItem(storageKey) === "done";
+      typeof window !== "undefined" && sessionStorage.getItem(stripeStorageKey) === "done";
 
     if (previouslyDone) {
       setStatus("success");
-      const cached = sessionStorage.getItem(`${storageKey}:appointment`);
-      if (cached) {
+      const stripeCached = sessionStorage.getItem(`${stripeStorageKey}:appointment`);
+      if (stripeCached) {
         try {
-          setAppointment(JSON.parse(cached) as AppointmentDetails);
+          setAppointment(JSON.parse(stripeCached) as AppointmentDetails);
         } catch {
           /* ignore invalid cache */
         }
@@ -64,9 +79,9 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
         }
         if (data.appointment) setAppointment(data.appointment);
         if (typeof window !== "undefined") {
-          sessionStorage.setItem(storageKey, "done");
+          sessionStorage.setItem(stripeStorageKey, "done");
           if (data.appointment) {
-            sessionStorage.setItem(`${storageKey}:appointment`, JSON.stringify(data.appointment));
+            sessionStorage.setItem(`${stripeStorageKey}:appointment`, JSON.stringify(data.appointment));
           }
         }
         setStatus("success");
@@ -107,7 +122,7 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
               </p>
               <h1 className="text-2xl md:text-3xl text-foreground">Booking confirmed</h1>
               <p className="mt-4 text-muted leading-relaxed">
-                Your refundable deposit has been received. A confirmation email is on its way with
+                Your free inspection request has been received. A confirmation email is on its way with
                 your appointment details.
               </p>
               <div

@@ -4,27 +4,25 @@
 import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
-import { formatDeposit } from "@/lib/currency";
+import type { PreferredInspectionTime } from "@/lib/inspection-datetime";
 
-const slotButtonBase =
+const contactFieldClass =
+  "w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
+
+const timeChoiceBase =
   "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
-const slotButtonSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
+const timeChoiceSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
 
 export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
-  const [settings, setSettings] = useState<any>(null);
-  const [availability, setAvailability] = useState<any[]>([]);
-  const [slot, setSlot] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTime, setPreferredTime] = useState<PreferredInspectionTime | "">("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     params.then((p) => setId(p.id));
-    fetch("/api/public/bootstrap")
-      .then((r) => r.json())
-      .then((d) => {
-        setSettings(d.settings);
-        setAvailability(d.availability || []);
-      });
   }, [params]);
 
   useEffect(() => {
@@ -34,62 +32,54 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
       .then((d) => setLead(d.lead));
   }, [id]);
 
-  const next14DaysSlots = useMemo(() => {
-    const values: string[] = [];
-    const byDay = new Map<number, any>(
-      availability.map((row) => [Number(row.day_of_week), row]),
-    );
-    for (let i = 1; i <= 14; i += 1) {
-      const d = addDays(new Date(), i);
-      const row = byDay.get(d.getDay());
-      if (!row || !Array.isArray(row.time_slots) || !row.time_slots.length) continue;
-      const dayIso = format(d, "yyyy-MM-dd");
-      const blackout = (row.blackout_dates || []).map((x: string) => String(x).slice(0, 10));
-      if (blackout.includes(dayIso)) continue;
-      for (const t of row.time_slots) values.push(`${dayIso}T${t}:00`);
-    }
-    return values;
-  }, [availability]);
+  const minDate = useMemo(() => format(addDays(new Date(), 1), "yyyy-MM-dd"), []);
+  const maxDate = useMemo(() => format(addDays(new Date(), 60), "yyyy-MM-dd"), []);
 
   const contactComplete = Boolean(
     lead?.name?.trim() && lead?.email?.trim() && lead?.phone?.trim(),
   );
 
-  const depositLabel = useMemo(() => {
-    if (!settings) return "—";
-    const usd = Number(settings.deposit_amount ?? 50);
-    if (!lead) return `$${usd}`;
-    return formatDeposit(
-      usd,
-      lead.address,
-      settings,
-      lead.country_code,
-      lead.latitude,
-      lead.longitude,
-    );
-  }, [lead, settings]);
-
-  async function checkout() {
+  async function submitBooking() {
+    if (!preferredDate) {
+      alert("Please select a preferred date.");
+      return;
+    }
+    if (!preferredTime) {
+      alert("Please select a preferred time.");
+      return;
+    }
     if (!contactComplete) {
       alert("Please complete your name, email, and phone on the quote page first.");
       return;
     }
-    window.fbq?.("track", "InitiateCheckout");
-    window.gtag?.("event", "begin_checkout");
-    const res = await fetch("/api/bookings/create-checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId: id,
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email,
-        bestTimeToContact: null,
-        inspectionDateTime: new Date(slot).toISOString(),
-      }),
-    });
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: id,
+          preferredDate,
+          preferredTime,
+          notes: notes.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Could not submit your booking");
+      }
+
+      if (typeof window !== "undefined" && data.appointment) {
+        sessionStorage.setItem(`booking-confirmed:${id}`, JSON.stringify(data.appointment));
+      }
+
+      window.location.href = `/confirmation/${id}`;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Booking failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (!lead) {
@@ -107,44 +97,85 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
       <div className="container-max py-8 md:py-12">
         <h1 className="text-2xl md:text-3xl">Book your free inspection</h1>
         <p className="mt-2 text-muted max-w-xl">
-          Choose a time slot and pay your refundable deposit to lock in your inspection.
+          Choose your preferred date and time. We will confirm your appointment by email.
         </p>
 
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <section className="rounded-lg border border-border-subtle bg-surface p-6 md:p-8">
-            <h2 className="text-lg text-foreground">Pick your inspection slot</h2>
-            <div className="mt-4 grid gap-2 max-h-[460px] overflow-auto pr-1">
-              {next14DaysSlots.length === 0 ? (
-                <p className="text-sm text-muted">No slots available in the next 14 days.</p>
-              ) : (
-                next14DaysSlots.map((s) => (
+            <h2 className="text-lg text-foreground">Inspection preferences</h2>
+
+            <div className="mt-4 space-y-2">
+              <label htmlFor="preferred-date" className="text-sm text-muted">
+                Preferred date
+              </label>
+              <input
+                id="preferred-date"
+                type="date"
+                min={minDate}
+                max={maxDate}
+                value={preferredDate}
+                onChange={(e) => setPreferredDate(e.target.value)}
+                className={contactFieldClass}
+              />
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <p className="text-sm text-muted">Preferred time</p>
+              <div className="grid gap-2">
+                {(
+                  [
+                    { value: "morning", label: "Morning" },
+                    { value: "afternoon", label: "Afternoon" },
+                    { value: "either", label: "Either morning or afternoon" },
+                  ] as const
+                ).map((option) => (
                   <button
-                    key={s}
+                    key={option.value}
                     type="button"
-                    onClick={() => setSlot(s)}
-                    className={slot === s ? slotButtonSelected : slotButtonBase}
+                    onClick={() => setPreferredTime(option.value)}
+                    className={
+                      preferredTime === option.value ? timeChoiceSelected : timeChoiceBase
+                    }
                   >
-                    {format(new Date(s), "EEE, MMM d — h:mm a")}
+                    {option.label}
                   </button>
-                ))
-              )}
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <label htmlFor="booking-notes" className="text-sm text-muted">
+                Additional notes for your roofer (optional)
+              </label>
+              <textarea
+                id="booking-notes"
+                rows={4}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Access instructions, parking, pets, or anything else we should know."
+                className={`${contactFieldClass} resize-y min-h-[120px]`}
+              />
             </div>
           </section>
 
           <section className="rounded-lg border border-border-subtle bg-surface p-6 md:p-8 flex flex-col">
-            <h2 className="text-lg text-foreground">Deposit checkout</h2>
+            <h2 className="text-lg text-foreground">Your details</h2>
             <div className="mt-4 space-y-3 text-sm">
               <p className="text-foreground">
                 <span className="text-muted">Name: </span>
-                {lead.name || "—"}
+                {lead.name || "Not provided"}
               </p>
               <p className="text-foreground">
                 <span className="text-muted">Email: </span>
-                {lead.email || "—"}
+                {lead.email || "Not provided"}
               </p>
               <p className="text-foreground">
                 <span className="text-muted">Phone: </span>
-                {lead.phone || "—"}
+                {lead.phone || "Not provided"}
+              </p>
+              <p className="text-foreground">
+                <span className="text-muted">Property: </span>
+                {lead.address || "Not provided"}
               </p>
             </div>
 
@@ -154,21 +185,17 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                 <Link href={`/quote/${id}`} className="text-accent underline">
                   quote page
                 </Link>{" "}
-                to enter your contact details before checkout.
+                to enter your contact details before booking.
               </p>
             )}
 
-            <p className="mt-4 text-sm text-muted">
-              Refundable deposit due today: <span className="text-foreground">{depositLabel}</span>
-            </p>
-
             <button
               type="button"
-              onClick={checkout}
-              disabled={!slot || !contactComplete}
+              onClick={() => void submitBooking()}
+              disabled={!preferredDate || !preferredTime || !contactComplete || submitting}
               className="mt-6 w-full btn-accent rounded-lg px-6 py-3.5 text-sm tracking-wide disabled:opacity-50"
             >
-              Continue to Stripe Checkout
+              {submitting ? "Submitting…" : "Confirm my inspection"}
             </button>
           </section>
         </div>

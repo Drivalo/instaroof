@@ -44,6 +44,8 @@ type LeadRecord = {
   quote_standard_high?: number | null;
   status?: string | null;
   inspection_datetime?: string | null;
+  best_time_to_contact?: string | null;
+  notes?: string | null;
 };
 
 function displayValue(value: string | null | undefined): string {
@@ -115,7 +117,8 @@ function formatEstimatedPriceRange(lead: LeadRecord, settings: SettingsRow): str
 function formatAppointment(lead: LeadRecord): { date: string; time: string } | null {
   if (!lead.inspection_datetime?.trim()) return null;
   const schedule = formatInspectionSchedule(lead.inspection_datetime);
-  return { date: schedule.date, time: schedule.time };
+  const time = lead.best_time_to_contact?.trim() || schedule.time;
+  return { date: schedule.date, time };
 }
 
 function subjectForContext(lead: LeadRecord, context: LeadNotificationContext): string {
@@ -142,7 +145,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
 
   const contextNote =
     context === "booking_confirmed"
-      ? "<p style=\"color:#6b6b6b;font-size:14px;\">The customer paid their deposit and booked a roof inspection.</p>"
+      ? "<p style=\"color:#6b6b6b;font-size:14px;\">The customer booked a roof inspection.</p>"
       : context === "analysis_complete"
         ? "<p style=\"color:#6b6b6b;font-size:14px;\">Satellite analysis has finished and quote ranges are updated.</p>"
         : context === "contact_updated"
@@ -171,6 +174,10 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
       ? `<tr><td colspan="2" style="padding:8px 12px;border:1px solid #e8e8e6;"><strong>${gutteringInspectionRequestedLine(lead.country_code)}</strong></td></tr>`
       : "";
 
+  const notesRow = lead.notes?.trim()
+    ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Notes</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.notes.trim()}</td></tr>`
+    : "";
+
   return `
 <!DOCTYPE html>
 <html>
@@ -187,6 +194,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     ${gutteringRow}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Address</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.address}</td></tr>
     ${appointmentRows}
+    ${notesRow}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Roof size</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${roofSize}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Price range</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${priceRange}</td></tr>
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Status</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.status)}</td></tr>
@@ -224,6 +232,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     ...(appointment
       ? [`Inspection date: ${appointment.date}`, `Inspection time: ${appointment.time}`]
       : []),
+    ...(lead.notes?.trim() ? [`Notes: ${lead.notes.trim()}`] : []),
     `Roof size: ${formatRoofSizeForLead(lead)}`,
     `Price range: ${formatEstimatedPriceRange(lead, settings)}`,
     `Status: ${displayValue(lead.status)}`,
