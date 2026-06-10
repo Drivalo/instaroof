@@ -67,11 +67,6 @@ export default function Home() {
   const companyName = bootstrap?.settings?.company_name ?? "Nimly";
   const companyLogo = bootstrap?.settings?.company_logo_url;
 
-  useEffect(() => {
-    if (!instantQuoteVisible || !previewSectionRef.current) return;
-    previewSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [instantQuoteVisible]);
-
   function hasValidCoords(lat?: number, lng?: number) {
     return (
       lat != null &&
@@ -138,6 +133,8 @@ export default function Home() {
     setPreviewRoofLabel(null);
     setPreviewPriceRange(null);
 
+    let estimateLoaded = false;
+
     try {
       const res = await fetch("/api/leads/preview-estimate", {
         method: "POST",
@@ -155,6 +152,7 @@ export default function Home() {
       }
       setPreviewRoofLabel(data.area?.label ?? `${data.roof_sqft} sq ft`);
       setPreviewPriceRange(data.price_range ?? null);
+      estimateLoaded = true;
     } catch (err) {
       console.error("[loadInstantEstimate] preview estimate failed:", err);
       const message = err instanceof Error ? err.message : "Could not estimate roof size. Please try again.";
@@ -168,6 +166,9 @@ export default function Home() {
       setInstantQuoteVisible(false);
     } finally {
       setLoadingPreview(false);
+      if (estimateLoaded) {
+        previewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
   }
 
