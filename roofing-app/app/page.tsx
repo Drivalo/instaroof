@@ -24,6 +24,13 @@ type BootstrapData = {
   testimonials: Array<{ id: number; name: string; location: string; quote_text: string; rating: number }>;
 };
 
+const UK_PROPERTY_TYPES = ["Terraced", "Semi-detached", "Detached"] as const;
+type UkPropertyType = (typeof UK_PROPERTY_TYPES)[number];
+
+const propertyChoiceBase =
+  "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
+const propertyChoiceSelected = "border-accent bg-[#F5A623] text-[#1C1C1C] hover:border-accent";
+
 export default function Home() {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
@@ -35,6 +42,7 @@ export default function Home() {
   const [previewRoofLabel, setPreviewRoofLabel] = useState<string | null>(null);
   const [previewPriceRange, setPreviewPriceRange] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<SupportedCountryCode>("us");
+  const [propertyType, setPropertyType] = useState<UkPropertyType | "">("");
   const addressInputRef = useRef<AddressFieldHandle>(null);
   const previewSectionRef = useRef<HTMLElement>(null);
 
@@ -71,6 +79,15 @@ export default function Home() {
     hasValidCoords(placeDetails.latitude, placeDetails.longitude);
 
   const primaryCtaEnabled = hasValidAddress && !loadingPreview;
+
+  const isGbFlow = useMemo(() => {
+    const fromPlace = placeDetails?.countryCode?.trim().toUpperCase();
+    if (fromPlace === "GB" || fromPlace === "UK") return true;
+    return selectedCountry === "gb";
+  }, [placeDetails?.countryCode, selectedCountry]);
+
+  const propertyTypeRequired = isGbFlow;
+  const propertyTypeComplete = !propertyTypeRequired || propertyType !== "";
 
   async function handlePrimaryCta() {
     if (!addressInputRef.current?.validateForSubmit()) return;
@@ -131,6 +148,12 @@ export default function Home() {
       return;
     }
 
+    const countryUpper = String(details.countryCode ?? selectedCountry).trim().toUpperCase();
+    const isGb = countryUpper === "GB" || countryUpper === "UK";
+    if (isGb && !propertyType) {
+      return;
+    }
+
     setLoadingAnalysis(true);
     const params = new URLSearchParams(window.location.search);
     const payload = {
@@ -141,6 +164,7 @@ export default function Home() {
       country_code: details.countryCode,
       email: null,
       phone: null,
+      ...(isGb && propertyType ? { property_type: propertyType } : {}),
       utm_source: params.get("utm_source"),
       utm_medium: params.get("utm_medium"),
       utm_campaign: params.get("utm_campaign"),
@@ -243,6 +267,9 @@ export default function Home() {
                 onCountryChange={(countryCode) => {
                   console.log("[page] onCountryChange", countryCode);
                   setSelectedCountry(countryCode);
+                  if (countryCode !== "gb") {
+                    setPropertyType("");
+                  }
                 }}
               />
               <button
@@ -302,6 +329,26 @@ export default function Home() {
                 </p>
               )}
 
+              {isGbFlow && !loadingPreview && previewRoofLabel && previewPriceRange && (
+                <div className="mt-6 space-y-2">
+                  <p className="text-sm text-muted">What type of property is this?</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {UK_PROPERTY_TYPES.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setPropertyType(option)}
+                        className={
+                          propertyType === option ? propertyChoiceSelected : propertyChoiceBase
+                        }
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={() => void startAiAnalysis()}
@@ -310,7 +357,8 @@ export default function Home() {
                   loadingPreview ||
                   !previewRoofLabel ||
                   !previewPriceRange ||
-                  !hasValidAddress
+                  !hasValidAddress ||
+                  !propertyTypeComplete
                 }
                 className="mt-8 btn-accent rounded-lg px-6 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >

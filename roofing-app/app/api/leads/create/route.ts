@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
       country_code,
       email,
       phone,
+      property_type,
       utm_source,
       utm_medium,
       utm_campaign,
@@ -128,6 +129,8 @@ export async function POST(req: NextRequest) {
       latitude,
       longitude,
     });
+    const normalizedPropertyType =
+      typeof property_type === "string" && property_type.trim() ? property_type.trim() : null;
 
     if (!inServiceArea) {
       const { data, error } = await insertLeadWithRetry({
@@ -175,6 +178,7 @@ export async function POST(req: NextRequest) {
       status: "quoted",
       email: email || null,
       phone: phone || null,
+      ...(normalizedPropertyType ? { property_type: normalizedPropertyType } : {}),
     });
 
     if (error) return buildErrorResponse(error, "lead insert failed");

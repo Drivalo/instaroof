@@ -37,6 +37,7 @@ type LeadRecord = {
   guttering?: boolean | null;
   address: string;
   country_code?: string | null;
+  property_type?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   roof_sqft?: number | null;
@@ -169,6 +170,10 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Roof material</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${roofMaterialLabel(lead.roof_material, lead.country_code, lead.address)}</td></tr>`
     : "";
 
+  const propertyTypeRow = lead.property_type?.trim()
+    ? `<tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Property type</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.property_type.trim()}</td></tr>`
+    : "";
+
   const gutteringRow =
     lead.guttering === true
       ? `<tr><td colspan="2" style="padding:8px 12px;border:1px solid #e8e8e6;"><strong>${gutteringInspectionRequestedLine(lead.country_code)}</strong></td></tr>`
@@ -191,6 +196,7 @@ function buildEmailHtml(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Phone</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${displayValue(lead.phone)}</td></tr>
     ${jobTypeRow}
     ${roofMaterialRow}
+    ${propertyTypeRow}
     ${gutteringRow}
     <tr><td style="padding:8px 12px;border:1px solid #e8e8e6;background:#f8f8f6;"><strong>Address</strong></td><td style="padding:8px 12px;border:1px solid #e8e8e6;">${lead.address}</td></tr>
     ${appointmentRows}
@@ -216,6 +222,9 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
   const roofMaterialLine = lead.roof_material
     ? [`Roof material: ${roofMaterialLabel(lead.roof_material, lead.country_code, lead.address)}`]
     : [];
+  const propertyTypeLine = lead.property_type?.trim()
+    ? [`Property type: ${lead.property_type.trim()}`]
+    : [];
   const gutteringLine =
     lead.guttering === true ? [gutteringInspectionRequestedLine(lead.country_code)] : [];
   return [
@@ -227,6 +236,7 @@ function buildPlainText(lead: LeadRecord, settings: SettingsRow, adminUrl: strin
     `Phone: ${displayValue(lead.phone)}`,
     ...jobTypeLine,
     ...roofMaterialLine,
+    ...propertyTypeLine,
     ...gutteringLine,
     `Address: ${lead.address}`,
     ...(appointment

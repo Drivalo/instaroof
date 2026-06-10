@@ -164,10 +164,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    const roofAreaSqm =
+    const roofAreaSqmRaw =
       analysis.roof_area_sqm != null && Number.isFinite(analysis.roof_area_sqm)
         ? analysis.roof_area_sqm
         : null;
+
+    let roofAreaSqm = roofAreaSqmRaw;
+    const isGbLead = String(lead.country_code ?? "").trim().toUpperCase() === "GB";
+    if (isGbLead && roofAreaSqmRaw != null && roofAreaSqmRaw > 0) {
+      const propertyType = String(lead.property_type ?? "").trim().toLowerCase();
+      const gbPropertyMultiplier = propertyType === "detached" ? 1.5 : 1.0;
+      roofAreaSqm = roofAreaSqmRaw * gbPropertyMultiplier;
+      console.info(`[vision/analyze] lead ${leadId} GB property_type roof_area_sqm multiplier`, {
+        property_type: lead.property_type ?? null,
+        multiplier: gbPropertyMultiplier,
+        roof_area_sqm_before: roofAreaSqmRaw,
+        roof_area_sqm_after: roofAreaSqm,
+      });
+    }
 
     const stage1Region = stage1CountryRegion(lead.country_code, lead.address);
     const stage1MedianSqm = stage1MedianRoofSqm(lead.country_code, lead.address);
