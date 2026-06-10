@@ -8,7 +8,7 @@ import AddressFieldWithCountry, {
   AddressPlaceDetails,
 } from "@/components/address-field-with-country";
 import { hasGoogleMapsKey } from "@/lib/google-maps-script";
-import { STAGE1_ROOF_SIZE_LABEL } from "@/lib/roof-estimate";
+import { STAGE1_ROOF_SIZE_LABEL, previewPriceRangeFromEstimate } from "@/lib/roof-estimate";
 import type { SupportedCountryCode } from "@/lib/supported-countries";
 
 type BootstrapData = {
@@ -26,6 +26,15 @@ type BootstrapData = {
 
 const UK_PROPERTY_TYPES = ["Terraced", "Semi-detached", "Detached"] as const;
 type UkPropertyType = (typeof UK_PROPERTY_TYPES)[number];
+
+const UK_PROPERTY_TYPE_SQM: Record<UkPropertyType, number> = {
+  Terraced: 70,
+  "Semi-detached": 90,
+  Detached: 150,
+};
+
+/** Matches formatRoofAreaDisplay in lib/roof-estimate.ts */
+const SQFT_PER_SQM = 0.092903;
 
 const propertyChoiceBase =
   "text-left w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground transition-colors hover:border-accent";
@@ -88,6 +97,31 @@ export default function Home() {
 
   const propertyTypeRequired = isGbFlow;
   const propertyTypeComplete = !propertyTypeRequired || propertyType !== "";
+
+  const displayPreviewRoofLabel = useMemo(() => {
+    if (loadingPreview || !previewRoofLabel) return previewRoofLabel;
+    if (!isGbFlow || !propertyType) return previewRoofLabel;
+    const sqm = UK_PROPERTY_TYPE_SQM[propertyType];
+    return `${sqm.toLocaleString("en-US")} m²`;
+  }, [loadingPreview, previewRoofLabel, isGbFlow, propertyType]);
+
+  const displayPreviewPriceRange = useMemo(() => {
+    if (loadingPreview || !previewPriceRange) return previewPriceRange;
+    if (!isGbFlow || !propertyType) return previewPriceRange;
+    const sqm = UK_PROPERTY_TYPE_SQM[propertyType];
+    const roofSqft = Math.round(sqm / SQFT_PER_SQM);
+    const address = placeDetails?.address ?? "";
+    const countryCode = placeDetails?.countryCode ?? "GB";
+    return previewPriceRangeFromEstimate(roofSqft, address, bootstrap?.settings ?? null, countryCode);
+  }, [
+    loadingPreview,
+    previewPriceRange,
+    isGbFlow,
+    propertyType,
+    placeDetails?.address,
+    placeDetails?.countryCode,
+    bootstrap?.settings,
+  ]);
 
   async function handlePrimaryCta() {
     if (!addressInputRef.current?.validateForSubmit()) return;
@@ -307,14 +341,14 @@ export default function Home() {
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">{STAGE1_ROOF_SIZE_LABEL}</p>
                   <p className="mt-1 text-lg text-foreground">
-                    {loadingPreview ? "Calculating…" : previewRoofLabel ?? "—"}
+                    {loadingPreview ? "Calculating…" : displayPreviewRoofLabel ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Price range</p>
                   <p className="mt-1 text-xs text-muted">Broad estimate based on typical roof size in your area</p>
                   <p className="mt-1 text-lg text-foreground">
-                    {loadingPreview ? "Calculating…" : previewPriceRange ?? "—"}
+                    {loadingPreview ? "Calculating…" : displayPreviewPriceRange ?? "—"}
                   </p>
                   <p className="mt-2 text-xs text-muted leading-relaxed">
                     Refined when we analyse your roof from satellite imagery.
