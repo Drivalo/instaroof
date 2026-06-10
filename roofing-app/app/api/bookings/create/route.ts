@@ -8,8 +8,8 @@ import { ensureEnvLoaded } from "@/lib/env.server";
 import {
   buildPreferredInspectionIso,
   formatInspectionSchedule,
-  isPreferredInspectionTime,
-  preferredInspectionTimeLabel,
+  inspectionHourLabel,
+  isInspectionHourSlot,
 } from "@/lib/inspection-datetime";
 import { sendLeadNotificationEmail } from "@/lib/lead-notification";
 import { sendBookingSms } from "@/lib/integrations";
@@ -40,11 +40,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please select a preferred date" }, { status: 400 });
     }
 
-    if (!isPreferredInspectionTime(preferredTime)) {
-      return NextResponse.json(
-        { error: "Please select a preferred time (morning, afternoon, or either)" },
-        { status: 400 },
-      );
+    if (!isInspectionHourSlot(preferredTime)) {
+      return NextResponse.json({ error: "Please select a preferred time" }, { status: 400 });
     }
 
     if (!isSupabaseConfigured()) {
@@ -52,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const inspectionIso = buildPreferredInspectionIso(preferredDate, preferredTime);
-    const timeLabel = preferredInspectionTimeLabel(preferredTime);
+    const timeLabel = inspectionHourLabel(preferredTime);
     const supabase = getSupabaseAdmin();
 
     const { data: existing, error: existingError } = await supabase

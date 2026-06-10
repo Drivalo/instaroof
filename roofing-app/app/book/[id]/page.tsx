@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { addDays, format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
-import type { PreferredInspectionTime } from "@/lib/inspection-datetime";
+import { INSPECTION_HOUR_OPTIONS } from "@/lib/inspection-datetime";
 
 const contactFieldClass =
   "w-full rounded-lg border border-border-subtle bg-background px-4 py-3 text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent transition-colors";
@@ -17,7 +17,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
   const [id, setId] = useState("");
   const [lead, setLead] = useState<any>(null);
   const [preferredDate, setPreferredDate] = useState("");
-  const [preferredTime, setPreferredTime] = useState<PreferredInspectionTime | "">("");
+  const [preferredTime, setPreferredTime] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -121,14 +121,8 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
             <div className="mt-6 space-y-2">
               <p className="text-sm text-muted">Preferred time</p>
-              <div className="grid gap-2">
-                {(
-                  [
-                    { value: "morning", label: "Morning" },
-                    { value: "afternoon", label: "Afternoon" },
-                    { value: "either", label: "Either morning or afternoon" },
-                  ] as const
-                ).map((option) => (
+              <div className="grid grid-cols-2 gap-2 max-h-[280px] overflow-auto pr-1 sm:grid-cols-3">
+                {INSPECTION_HOUR_OPTIONS.map((option) => (
                   <button
                     key={option.value}
                     type="button"

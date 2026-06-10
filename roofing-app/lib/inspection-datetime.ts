@@ -24,23 +24,46 @@ export function formatInspectionSchedule(iso: string): {
   };
 }
 
-export type PreferredInspectionTime = "morning" | "afternoon" | "either";
+export const INSPECTION_START_HOUR = 8;
+export const INSPECTION_END_HOUR = 17;
 
-export function isPreferredInspectionTime(value: string): value is PreferredInspectionTime {
-  return value === "morning" || value === "afternoon" || value === "either";
+function formatHourLabel(hour: number): string {
+  return format(new Date(2000, 0, 1, hour, 0, 0), "h:mm a");
 }
 
-export function preferredInspectionTimeLabel(preference: PreferredInspectionTime): string {
-  if (preference === "morning") return "Morning";
-  if (preference === "afternoon") return "Afternoon";
-  return "Morning or afternoon";
+export const INSPECTION_HOUR_OPTIONS = Array.from(
+  { length: INSPECTION_END_HOUR - INSPECTION_START_HOUR + 1 },
+  (_, index) => {
+    const hour = INSPECTION_START_HOUR + index;
+    return {
+      value: String(hour).padStart(2, "0"),
+      label: formatHourLabel(hour),
+    };
+  },
+);
+
+export function isInspectionHourSlot(value: string): boolean {
+  const hour = Number.parseInt(value, 10);
+  return (
+    Number.isInteger(hour) &&
+    hour >= INSPECTION_START_HOUR &&
+    hour <= INSPECTION_END_HOUR
+  );
 }
 
-/** Map preferred date + time window to a stored inspection datetime. */
-export function buildPreferredInspectionIso(
-  preferredDate: string,
-  preference: PreferredInspectionTime,
-): string {
-  const hour = preference === "morning" ? 9 : preference === "afternoon" ? 13 : 10;
+export function inspectionHourLabel(hourSlot: string): string {
+  const hour = Number.parseInt(hourSlot, 10);
+  if (!isInspectionHourSlot(hourSlot)) {
+    throw new Error("Invalid inspection hour");
+  }
+  return formatHourLabel(hour);
+}
+
+/** Map preferred date + hour slot to a stored inspection datetime. */
+export function buildPreferredInspectionIso(preferredDate: string, hourSlot: string): string {
+  const hour = Number.parseInt(hourSlot, 10);
+  if (!isInspectionHourSlot(hourSlot)) {
+    throw new Error("Invalid inspection hour");
+  }
   return normalizeInspectionDatetime(`${preferredDate}T${String(hour).padStart(2, "0")}:00:00`);
 }
