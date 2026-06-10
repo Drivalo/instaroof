@@ -240,7 +240,7 @@ export default function Home() {
       country_code: details.countryCode,
       email: null,
       phone: null,
-      ...(isGb && propertyType ? { property_type: propertyType } : {}),
+      ...(propertyType ? { property_type: propertyType } : {}),
       utm_source: params.get("utm_source"),
       utm_medium: params.get("utm_medium"),
       utm_campaign: params.get("utm_campaign"),
