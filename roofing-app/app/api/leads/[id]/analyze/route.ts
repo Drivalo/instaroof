@@ -194,7 +194,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
     } else if (
       countryCode === "AU" &&
-      propertyType.toLowerCase() === "acreage/large home" &&
+      (propertyType.toLowerCase() === "acreage" ||
+        propertyType.toLowerCase() === "acreage/large home") &&
       roofAreaSqmRaw != null &&
       roofAreaSqmRaw > 0
     ) {

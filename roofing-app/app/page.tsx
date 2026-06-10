@@ -22,7 +22,7 @@ const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly Prope
   au: [
     { label: "Townhouse", sqm: 110 },
     { label: "House", sqm: 160 },
-    { label: "Acreage/Large home", sqm: 220 },
+    { label: "Acreage", sqm: 220 },
   ],
   nz: [
     { label: "Townhouse", sqm: 100 },
