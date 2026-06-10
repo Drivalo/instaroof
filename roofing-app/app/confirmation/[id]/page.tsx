@@ -22,54 +22,111 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
     if (!leadId) return;
 
     const storageKey = `booking-confirmed:${leadId}`;
+    const emailStorageKey = `booking-email-done:${leadId}`;
     const cached = typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
+    const emailPreviouslyDone =
+      typeof window !== "undefined" && sessionStorage.getItem(emailStorageKey) === "done";
 
+    let cachedAppointment: AppointmentDetails | null = null;
     if (cached) {
       try {
-        setAppointment(JSON.parse(cached) as AppointmentDetails);
-        setStatus("success");
-        return;
+        cachedAppointment = JSON.parse(cached) as AppointmentDetails;
+        setAppointment(cachedAppointment);
       } catch {
-        /* fall through to Stripe confirm or error */
+        cachedAppointment = null;
       }
     }
 
-    if (!sessionId) {
+    if (sessionId) {
+      const stripeStorageKey = `booking-confirm:${leadId}:${sessionId}`;
+      const previouslyDone =
+        typeof window !== "undefined" && sessionStorage.getItem(stripeStorageKey) === "done";
+
+      if (previouslyDone) {
+        setStatus("success");
+        const stripeCached = sessionStorage.getItem(`${stripeStorageKey}:appointment`);
+        if (stripeCached) {
+          try {
+            setAppointment(JSON.parse(stripeCached) as AppointmentDetails);
+          } catch {
+            /* ignore invalid cache */
+          }
+        }
+      }
+
+      console.info("[confirmation-page] calling /api/bookings/confirm", {
+        leadId,
+        sessionId,
+        previouslyDone,
+      });
+
+      fetch("/api/bookings/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, sessionId }),
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          console.info("[confirmation-page] confirm response", {
+            ok: res.ok,
+            status: res.status,
+            data,
+          });
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Could not confirm your booking");
+          }
+          if (data.appointment) setAppointment(data.appointment);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem(stripeStorageKey, "done");
+            if (data.appointment) {
+              sessionStorage.setItem(`${stripeStorageKey}:appointment`, JSON.stringify(data.appointment));
+            }
+          }
+          setStatus("success");
+
+          if (data.emails?.customer?.sent) {
+            console.info("[confirmation-page] customer confirmation email sent", data.emails.customer);
+          } else if (data.emails?.customer) {
+            console.error("[confirmation-page] customer confirmation email not sent", data.emails.customer);
+          }
+        })
+        .catch((err) => {
+          if (!previouslyDone) {
+            setStatus("error");
+            setError(err instanceof Error ? err.message : "Confirmation failed");
+          } else {
+            console.warn(
+              "[confirmation-page] re-confirm failed but booking was already confirmed",
+              err instanceof Error ? err.message : err,
+            );
+          }
+        });
+      return;
+    }
+
+    if (!cachedAppointment) {
       setStatus("error");
       setError("No booking found. Please complete the booking form first.");
       return;
     }
 
-    const stripeStorageKey = `booking-confirm:${leadId}:${sessionId}`;
-    const previouslyDone =
-      typeof window !== "undefined" && sessionStorage.getItem(stripeStorageKey) === "done";
-
-    if (previouslyDone) {
+    if (emailPreviouslyDone) {
       setStatus("success");
-      const stripeCached = sessionStorage.getItem(`${stripeStorageKey}:appointment`);
-      if (stripeCached) {
-        try {
-          setAppointment(JSON.parse(stripeCached) as AppointmentDetails);
-        } catch {
-          /* ignore invalid cache */
-        }
-      }
+      return;
     }
 
-    console.info("[confirmation-page] calling /api/bookings/confirm", {
+    console.info("[confirmation-page] calling /api/bookings/confirm (direct booking)", {
       leadId,
-      sessionId,
-      previouslyDone,
     });
 
     fetch("/api/bookings/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId, sessionId }),
+      body: JSON.stringify({ leadId }),
     })
       .then(async (res) => {
         const data = await res.json();
-        console.info("[confirmation-page] confirm response", {
+        console.info("[confirmation-page] direct confirm response", {
           ok: res.ok,
           status: res.status,
           data,
@@ -79,9 +136,9 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
         }
         if (data.appointment) setAppointment(data.appointment);
         if (typeof window !== "undefined") {
-          sessionStorage.setItem(stripeStorageKey, "done");
+          sessionStorage.setItem(emailStorageKey, "done");
           if (data.appointment) {
-            sessionStorage.setItem(`${stripeStorageKey}:appointment`, JSON.stringify(data.appointment));
+            sessionStorage.setItem(storageKey, JSON.stringify(data.appointment));
           }
         }
         setStatus("success");
@@ -93,12 +150,12 @@ function ConfirmationContent({ leadId }: { leadId: string }) {
         }
       })
       .catch((err) => {
-        if (!previouslyDone) {
+        if (!emailPreviouslyDone) {
           setStatus("error");
           setError(err instanceof Error ? err.message : "Confirmation failed");
         } else {
           console.warn(
-            "[confirmation-page] re-confirm failed but booking was already confirmed",
+            "[confirmation-page] direct re-confirm failed but booking was already confirmed",
             err instanceof Error ? err.message : err,
           );
         }

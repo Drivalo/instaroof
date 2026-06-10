@@ -14,6 +14,90 @@ import { getSettings, getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supab
 import { sendBookingSms } from "@/lib/integrations";
 import { getStripeClient } from "@/lib/stripe";
 
+async function sendBookingConfirmationEmails(
+  req: NextRequest,
+  confirmLeadId: number,
+  lead: Record<string, unknown>,
+  inspectionIsoFinal: string,
+) {
+  const appointment = {
+    ...formatInspectionSchedule(inspectionIsoFinal),
+    time: String(lead.best_time_to_contact ?? "").trim() || formatInspectionSchedule(inspectionIsoFinal).time,
+    combined: `${formatInspectionSchedule(inspectionIsoFinal).date} (${String(lead.best_time_to_contact ?? "").trim() || formatInspectionSchedule(inspectionIsoFinal).time})`,
+    address: String(lead.address ?? ""),
+  };
+
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    req.headers.get("origin")?.trim() ||
+    "http://localhost:3000";
+
+  console.info("[bookings/confirm] ATTEMPTING sendCustomerBookingConfirmedEmail", {
+    leadId: confirmLeadId,
+    appBaseUrl,
+    inspectionDatetimePassed: inspectionIsoFinal,
+    customerEmail: lead.email ?? null,
+    hasResendApiKey: Boolean(process.env.RESEND_API_KEY?.trim()),
+  });
+
+  const customerEmailResult = await sendCustomerBookingConfirmedEmail(
+    confirmLeadId,
+    appBaseUrl,
+    {
+      inspectionDatetime: inspectionIsoFinal,
+      preloadedLead: mapRowToLeadRecord({
+        ...lead,
+        deposit_paid: false,
+        inspection_datetime: inspectionIsoFinal,
+      }),
+    },
+  );
+
+  console.info("[bookings/confirm] customer email result", {
+    leadId: confirmLeadId,
+    sent: customerEmailResult.sent,
+    skipped: customerEmailResult.skipped ?? false,
+    reason: customerEmailResult.reason ?? null,
+    messageId: customerEmailResult.messageId ?? null,
+  });
+
+  console.info("[bookings/confirm] sending BO booking notification email", {
+    leadId: confirmLeadId,
+    context: "booking_confirmed",
+  });
+  const boEmailResult = await sendLeadNotificationEmail(
+    confirmLeadId,
+    appBaseUrl,
+    "booking_confirmed",
+  );
+  console.info("[bookings/confirm] BO email result", boEmailResult);
+
+  const settings = await getSettings();
+  const dateText = format(new Date(inspectionIsoFinal), "PPP");
+  const timeLabel = String(lead.best_time_to_contact ?? "").trim();
+  const smsWhen = timeLabel ? `${dateText} (${timeLabel})` : format(new Date(inspectionIsoFinal), "PPP 'at' p");
+  console.info("[bookings/confirm] sending booking SMS", { leadId: confirmLeadId });
+  try {
+    await sendBookingSms(
+      String(lead.phone ?? ""),
+      `Hi ${lead.name}, this is ${settings.company_name}. Your roof inspection is requested for ${smsWhen}. Reply C to confirm or R to reschedule.`,
+    );
+  } catch (smsErr) {
+    console.warn("[bookings/confirm] booking SMS failed", {
+      leadId: confirmLeadId,
+      error: smsErr instanceof Error ? smsErr.message : String(smsErr),
+    });
+  }
+
+  return {
+    appointment,
+    emails: {
+      customer: customerEmailResult,
+      business: boEmailResult,
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     ensureEnvLoaded();
@@ -25,9 +109,9 @@ export async function POST(req: NextRequest) {
       leadId,
       hasSessionId: Boolean(sessionId),
     });
-    if (!leadId || !sessionId) {
-      console.warn("[bookings/confirm] missing leadId or sessionId");
-      return NextResponse.json({ error: "Missing leadId or sessionId" }, { status: 400 });
+    if (!leadId) {
+      console.warn("[bookings/confirm] missing leadId");
+      return NextResponse.json({ error: "Missing leadId" }, { status: 400 });
     }
 
     if (!isSupabaseConfigured()) {
@@ -38,6 +122,65 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let confirmLeadId = Number(leadId);
+    if (!Number.isFinite(confirmLeadId)) {
+      return NextResponse.json({ error: "Invalid leadId" }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    if (!sessionId) {
+      const { data: lead, error: leadError } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("id", confirmLeadId)
+        .single();
+
+      if (leadError || !lead) {
+        console.error("[bookings/confirm] direct confirm — lead not found", {
+          leadId: confirmLeadId,
+          error: leadError?.message,
+        });
+        throw leadError || new Error("Lead not found");
+      }
+
+      const inspectionIsoFinal = lead.inspection_datetime?.trim() || null;
+      if (!inspectionIsoFinal) {
+        console.error("[bookings/confirm] direct confirm — inspection_datetime missing", {
+          leadId: confirmLeadId,
+        });
+        return NextResponse.json(
+          { error: "Appointment time was not saved. Please contact support." },
+          { status: 500 },
+        );
+      }
+
+      if (!lead.email?.trim()) {
+        console.error("[bookings/confirm] direct confirm — lead has no email", {
+          leadId: confirmLeadId,
+        });
+        return NextResponse.json({ error: "Lead has no email address on file." }, { status: 400 });
+      }
+
+      console.info("[bookings/confirm] direct confirm — sending booking emails", {
+        leadId: confirmLeadId,
+        inspection_datetime: inspectionIsoFinal,
+        customerEmail: lead.email,
+      });
+
+      const result = await sendBookingConfirmationEmails(
+        req,
+        confirmLeadId,
+        lead as Record<string, unknown>,
+        inspectionIsoFinal,
+      );
+
+      return NextResponse.json({
+        ok: true,
+        ...result,
+      });
+    }
+
     const settings = await getSettings();
     const stripe = getStripeClient();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -46,21 +189,19 @@ export async function POST(req: NextRequest) {
       ? Number(session.metadata.lead_id)
       : NaN;
     const requestLeadId = Number(leadId);
-    const numericLeadId = Number.isFinite(metadataLeadId) ? metadataLeadId : requestLeadId;
 
-    if (!Number.isFinite(numericLeadId)) {
-      return NextResponse.json({ error: "Invalid leadId" }, { status: 400 });
-    }
-
-    if (Number.isFinite(requestLeadId) && requestLeadId !== numericLeadId) {
-      console.warn("[bookings/confirm] leadId mismatch — using Stripe metadata", {
-        requestLeadId,
-        metadataLeadId: numericLeadId,
-      });
+    if (Number.isFinite(metadataLeadId)) {
+      if (Number.isFinite(requestLeadId) && requestLeadId !== metadataLeadId) {
+        console.warn("[bookings/confirm] leadId mismatch — using Stripe metadata", {
+          requestLeadId,
+          metadataLeadId,
+        });
+      }
+      confirmLeadId = metadataLeadId;
     }
 
     console.info("[bookings/confirm] Stripe session", {
-      leadId: numericLeadId,
+      leadId: confirmLeadId,
       payment_status: session.payment_status,
       metadata_inspection: session.metadata?.inspection_datetime ?? null,
       metadata_lead_id: session.metadata?.lead_id ?? null,
@@ -73,24 +214,22 @@ export async function POST(req: NextRequest) {
       ? normalizeInspectionDatetime(metadataInspection)
       : null;
 
-    const supabase = getSupabaseAdmin();
-
     const { data: existing, error: existingError } = await supabase
       .from("leads")
       .select("*")
-      .eq("id", numericLeadId)
+      .eq("id", confirmLeadId)
       .single();
 
     if (existingError || !existing) {
       console.error("[bookings/confirm] lead not found", {
-        leadId: numericLeadId,
+        leadId: confirmLeadId,
         error: existingError?.message,
       });
       throw existingError || new Error("Lead not found");
     }
 
     console.info("[bookings/confirm] existing lead", {
-      leadId: numericLeadId,
+      leadId: confirmLeadId,
       deposit_paid: existing.deposit_paid,
       inspection_datetime: existing.inspection_datetime ?? null,
     });
@@ -116,13 +255,13 @@ export async function POST(req: NextRequest) {
       const { data, error: leadError } = await supabase
         .from("leads")
         .update(updatePayload)
-        .eq("id", numericLeadId)
+        .eq("id", confirmLeadId)
         .select("*")
         .single();
       if (leadError || !data) throw leadError || new Error("Lead update failed");
       lead = data;
       console.info("[bookings/confirm] lead updated", {
-        leadId: numericLeadId,
+        leadId: confirmLeadId,
         inspection_datetime: lead.inspection_datetime ?? null,
       });
     }
@@ -131,13 +270,13 @@ export async function POST(req: NextRequest) {
       const { data: repaired, error: repairError } = await supabase
         .from("leads")
         .update({ inspection_datetime: inspectionIso })
-        .eq("id", numericLeadId)
+        .eq("id", confirmLeadId)
         .select("*")
         .single();
       if (!repairError && repaired) {
         lead = repaired;
         console.info("[bookings/confirm] inspection_datetime repaired from Stripe metadata", {
-          leadId: numericLeadId,
+          leadId: confirmLeadId,
           inspection_datetime: lead.inspection_datetime,
         });
       }
@@ -153,7 +292,7 @@ export async function POST(req: NextRequest) {
 
     if (!inspectionIsoFinal) {
       console.error("[bookings/confirm] cannot send emails — inspection_datetime missing", {
-        leadId: numericLeadId,
+        leadId: confirmLeadId,
         dbValue: lead.inspection_datetime,
         stripeMetadata: metadataInspection,
       });
@@ -171,11 +310,11 @@ export async function POST(req: NextRequest) {
     const { data: preEmailLead, error: preEmailError } = await supabase
       .from("leads")
       .select("id, email, inspection_datetime, deposit_paid")
-      .eq("id", numericLeadId)
+      .eq("id", confirmLeadId)
       .single();
 
     console.info("[bookings/confirm] PRE-CUSTOMER-EMAIL — DB snapshot", {
-      leadId: numericLeadId,
+      leadId: confirmLeadId,
       fetchError: preEmailError?.message ?? null,
       email: preEmailLead?.email ?? null,
       inspection_datetime_db: preEmailLead?.inspection_datetime ?? null,
@@ -187,7 +326,7 @@ export async function POST(req: NextRequest) {
 
     if (!lead.email?.trim()) {
       console.error("[bookings/confirm] customer email skipped — lead has no email", {
-        leadId: numericLeadId,
+        leadId: confirmLeadId,
       });
     }
 
@@ -196,7 +335,7 @@ export async function POST(req: NextRequest) {
 
     if (emailAlreadySent) {
       console.info("[bookings/confirm] customer email already sent (Stripe metadata)", {
-        leadId: numericLeadId,
+        leadId: confirmLeadId,
         messageId: session.metadata?.customer_email_message_id ?? null,
       });
       customerEmailResult = {
@@ -207,7 +346,7 @@ export async function POST(req: NextRequest) {
       };
     } else {
       console.info("[bookings/confirm] ATTEMPTING sendCustomerBookingConfirmedEmail", {
-        leadId: numericLeadId,
+        leadId: confirmLeadId,
         appBaseUrl,
         inspectionDatetimePassed: inspectionIsoFinal,
         customerEmail: lead.email ?? null,
@@ -215,7 +354,7 @@ export async function POST(req: NextRequest) {
       });
 
       customerEmailResult = await sendCustomerBookingConfirmedEmail(
-        numericLeadId,
+        confirmLeadId,
         appBaseUrl,
         {
           inspectionDatetime: inspectionIsoFinal,
@@ -237,12 +376,12 @@ export async function POST(req: NextRequest) {
             },
           });
           console.info("[bookings/confirm] marked customer email sent in Stripe metadata", {
-            leadId: numericLeadId,
+            leadId: confirmLeadId,
             messageId: customerEmailResult.messageId,
           });
         } catch (metaErr) {
           console.warn("[bookings/confirm] could not update Stripe metadata after email send", {
-            leadId: numericLeadId,
+            leadId: confirmLeadId,
             error: metaErr instanceof Error ? metaErr.message : String(metaErr),
           });
         }
@@ -250,7 +389,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.info("[bookings/confirm] customer email result", {
-      leadId: numericLeadId,
+      leadId: confirmLeadId,
       sent: customerEmailResult.sent,
       skipped: customerEmailResult.skipped ?? false,
       reason: customerEmailResult.reason ?? null,
@@ -258,11 +397,11 @@ export async function POST(req: NextRequest) {
     });
 
     console.info("[bookings/confirm] sending BO booking notification email", {
-      leadId: numericLeadId,
+      leadId: confirmLeadId,
       context: "booking_confirmed",
     });
     const boEmailResult = await sendLeadNotificationEmail(
-      numericLeadId,
+      confirmLeadId,
       appBaseUrl,
       "booking_confirmed",
     );
@@ -270,7 +409,7 @@ export async function POST(req: NextRequest) {
 
     if (!alreadyConfirmed) {
       const dateText = format(new Date(inspectionIsoFinal), "PPP 'at' p");
-      console.info("[bookings/confirm] sending booking SMS", { leadId: numericLeadId });
+      console.info("[bookings/confirm] sending booking SMS", { leadId: confirmLeadId });
       await sendBookingSms(
         lead.phone,
         `Hi ${lead.name}, this is ${settings.company_name}. Your roof inspection is confirmed for ${dateText}. Reply C to confirm or R to reschedule.`,

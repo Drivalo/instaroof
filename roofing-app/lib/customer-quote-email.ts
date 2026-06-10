@@ -356,7 +356,7 @@ async function fetchLeadForEmail(leadId: number): Promise<LeadRecord | null> {
   const supabase = getSupabaseAdmin();
   const { data: lead, error } = await supabase
     .from("leads")
-    .select(LEAD_EMAIL_SELECT)
+    .select("*")
     .eq("id", leadId)
     .single();
 
@@ -421,7 +421,9 @@ async function sendCustomerEmail(
   const dbInspection = record.inspection_datetime ?? null;
   const confirmInspection = options.inspectionDatetimeFromConfirm?.trim() || null;
 
-  if (confirmInspection && !dbInspection) {
+  if (options.requireInspection && confirmInspection) {
+    record.inspection_datetime = confirmInspection;
+  } else if (confirmInspection && !dbInspection) {
     console.warn(
       "[customer-quote-email] DB missing inspection_datetime — using value from confirm route",
       { leadId, confirmInspection },
