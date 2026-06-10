@@ -245,7 +245,7 @@ export default function Home() {
                 disabled={!primaryCtaEnabled}
                 className="relative z-10 btn-accent w-full sm:w-auto shrink-0 rounded-lg px-8 py-3.5 text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loadingPreview ? "Estimating…" : "Get My Instant Estimate"}
+                {loadingPreview ? "Estimating…" : "Get My Instant Quote"}
               </button>
               <p className="text-sm text-muted leading-relaxed">
                 Best suited for standard detached and semi-detached homes. For converted properties or complex buildings, your roofer will refine the estimate on inspection.
