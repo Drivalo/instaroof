@@ -561,6 +561,7 @@ export async function sendCustomerBookingConfirmedEmail(
     requireInspection: true,
     inspectionDatetimeFromConfirm: options?.inspectionDatetime ?? null,
     preloadedLead: options?.preloadedLead ?? null,
+    from: "hello@nimly.tech",
   });
 }
 
