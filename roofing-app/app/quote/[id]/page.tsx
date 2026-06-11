@@ -607,6 +607,9 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
                 <p>
                   Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estimates may vary ±20%. Your roofer will confirm exact measurements on site.
+                </p>
                 {imperialRoofMeasurements ? (
                   <p>
                     Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
