@@ -28,7 +28,7 @@ const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly Prope
     {
       label: "House",
       sqm: 160,
-      description: "Freestanding home on a standard suburban block",
+      description: "Freestanding home, own roof",
     },
     {
       label: "Acreage",
