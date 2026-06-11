@@ -139,7 +139,7 @@ Human identification is not part of this task. Do not name, count, describe, or 
 
 const AU_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   townhouse:
-    "This is an Australian townhouse or terrace. Roof covers one floor only, typically 40–100 sqm. Do not include adjacent townhouses, garages, or carports.",
+    "This is an Australian townhouse or terrace. Roof covers one floor only, typically 60–110 sqm. Do not underestimate large Victorian terraces.",
   house:
     "This is an Australian detached house. Single storey roofs are typically 180–350 sqm. Do not anchor to the lower end of the range for large properties.",
   acreage:
