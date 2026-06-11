@@ -429,6 +429,9 @@ export default function Home() {
                   <p className="mt-1 text-lg text-foreground">
                     {loadingPreview ? "Calculating…" : displayPreviewRoofLabel ?? "—"}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Estimates may vary ±20%. Your roofer will confirm exact measurements on site.
+                  </p>
                 </div>
                 <div className="rounded-lg border border-border-subtle bg-background px-5 py-4">
                   <p className="text-sm text-muted">Price range</p>
