@@ -33,7 +33,7 @@ const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly Prope
     {
       label: "Acreage",
       sqm: 220,
-      description: "Large block or rural property",
+      description: "Rural property or large block over 2,000m²",
     },
   ],
   nz: [
@@ -444,7 +444,7 @@ export default function Home() {
 
               {!loadingPreview && previewRoofLabel && previewPriceRange && (
                 <p className="mt-6 text-sm text-muted leading-relaxed">
-                  A regional average for homes in your area, not a measurement of your property. AI satellite
+                  A country average for homes in your area, not a measurement of your property. AI satellite
                   analysis helps refine your starting estimate when you continue.
                 </p>
               )}

@@ -93,7 +93,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
     }
 
-    const staticUrlForVision = mapsStaticSatelliteUrl(lead.latitude, lead.longitude, mapsKey);
+    const propertyTypeForZoom = typeof lead.property_type === "string" ? lead.property_type.trim() : "";
+    const visionSatelliteZoom =
+      propertyTypeForZoom === "Acreage" ? 17 : propertyTypeForZoom === "House" ? 18 : 19;
+    const staticUrlForVision = mapsStaticSatelliteUrl(
+      lead.latitude,
+      lead.longitude,
+      mapsKey,
+      visionSatelliteZoom,
+    );
     const lat = Number(lead.latitude);
     const metersPerPixelApprox =
       Number.isFinite(lat) && Math.abs(lat) <= 85
@@ -193,19 +201,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const originalSqm = roofAreaSqmRaw;
       roofAreaSqm = originalSqm * 1.5;
       console.info("[vision/analyze] UK detached multiplier applied", {
-        original_sqm: originalSqm,
-        adjusted_sqm: roofAreaSqm,
-        property_type: propertyType,
-      });
-    } else if (
-      countryCode === "AU" &&
-      propertyType.toLowerCase() === "acreage" &&
-      roofAreaSqmRaw != null &&
-      roofAreaSqmRaw > 0
-    ) {
-      const originalSqm = roofAreaSqmRaw;
-      roofAreaSqm = originalSqm * 1.5;
-      console.info("[vision/analyze] AU acreage multiplier applied", {
         original_sqm: originalSqm,
         adjusted_sqm: roofAreaSqm,
         property_type: propertyType,

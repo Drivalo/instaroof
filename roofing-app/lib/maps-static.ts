@@ -14,17 +14,22 @@ export function maskGoogleMapsKeyInUrl(url: string) {
 }
 
 /** Google Static Maps satellite image URL (server-side fetch / vision). */
-export function mapsStaticSatelliteUrl(lat: number, lng: number, googleMapsApiKey?: string | null) {
+export function mapsStaticSatelliteUrl(
+  lat: number,
+  lng: number,
+  googleMapsApiKey?: string | null,
+  zoom: number = SATELLITE_STATIC_ZOOM,
+) {
   const apiKey = getGoogleMapsApiKey(googleMapsApiKey);
   const params = new URLSearchParams({
     center: `${lat},${lng}`,
-    zoom: String(SATELLITE_STATIC_ZOOM),
+    zoom: String(zoom),
     size: "600x600",
     scale: "2",
     maptype: "satellite",
   });
   if (apiKey) params.set("key", apiKey);
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}&markers=color:red%7C${lat},${lng}`;
 }
 
 /** Same-origin proxy path for browser display (keeps key on server). */

@@ -148,6 +148,19 @@ const AU_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
     "This is an apartment. Measure only the roof of the individual unit footprint, typically 50–90 sqm.",
 };
 
+const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
+  terraced:
+    "This is a UK terraced house. Roof area typically 50–80 sqm. Measure only this property's roof section, not neighbouring terraces.",
+  "semi-detached":
+    "This is a UK semi-detached house. Roof area typically 70–120 sqm. Measure only this property's half of the roof, not the neighbour's.",
+  detached:
+    "This is a UK detached house. Roof area typically 100–200 sqm for standard properties, up to 250 sqm for larger homes. Do not underestimate — measure the full roof including any attached garage.",
+  bungalow:
+    "This is a UK bungalow. Single storey, roof area typically 80–150 sqm.",
+  flat:
+    "This is a UK flat or apartment. Measure only the roof of the individual unit footprint, typically 40–70 sqm.",
+};
+
 function buildVisionUserPrompt(
   countryCode: string | null | undefined,
   tileSpanMetres?: number,
@@ -165,6 +178,11 @@ function buildVisionUserPrompt(
       const auGuidance = AU_PROPERTY_TYPE_GUIDANCE[trimmedPropertyType.toLowerCase()];
       if (auGuidance) {
         propertyTypeLine = `\n\n${auGuidance}`;
+      }
+    } else if (code === "GB") {
+      const gbGuidance = GB_PROPERTY_TYPE_GUIDANCE[trimmedPropertyType.toLowerCase()];
+      if (gbGuidance) {
+        propertyTypeLine = `\n\n${gbGuidance}`;
       }
     } else {
       propertyTypeLine = `\n\nProperty type: ${trimmedPropertyType}. Use this to calibrate your estimate.`;
@@ -518,6 +536,7 @@ async function runVisionAnalysisInner(
     throw new VisionUnableToEstimateError(VISION_UNABLE_MESSAGE, "OPENAI_API_KEY not configured");
   }
 
+  console.log(`${LOG_PREFIX} Google Maps Static API URL (full, before GPT-4o):`, imageUrl);
   const imageDataUrl = await satelliteImageToDataUrl(imageUrl, VISION_ANALYSIS_TIMEOUT_MS);
   const encodedKb = Math.round(imageDataUrl.length / 1024);
   const tileSpanMetres =
