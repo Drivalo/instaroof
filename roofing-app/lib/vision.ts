@@ -528,6 +528,7 @@ async function runVisionAnalysisInner(
   countryCode: string | null | undefined,
   latitude?: number | null,
   propertyType?: string | null,
+  zoom: number = SATELLITE_STATIC_ZOOM,
 ): Promise<VisionAnalysis> {
   console.info(`${LOG_PREFIX} runVisionAnalysisInner start`);
   const apiKey = getOpenAiApiKey();
@@ -542,7 +543,7 @@ async function runVisionAnalysisInner(
   const tileSpanMetres =
     latitude != null
       ? Math.round(
-          (156543.03392 * Math.cos(((latitude ?? 0) * Math.PI) / 180) / Math.pow(2, SATELLITE_STATIC_ZOOM)) *
+          (156543.03392 * Math.cos(((latitude ?? 0) * Math.PI) / 180) / Math.pow(2, zoom)) *
             600,
         )
       : undefined;
@@ -651,6 +652,7 @@ export async function runVisionAnalysis(
   countryCode?: string | null,
   latitude?: number | null,
   propertyType?: string | null,
+  zoom: number = SATELLITE_STATIC_ZOOM,
 ): Promise<VisionAnalysis> {
   ensureEnvLoaded();
   const timeoutMs = VISION_ANALYSIS_TIMEOUT_MS;
@@ -662,7 +664,7 @@ export async function runVisionAnalysis(
 
   try {
     const result = await Promise.race([
-      runVisionAnalysisInner(imageUrl, countryCode, latitude, propertyType),
+      runVisionAnalysisInner(imageUrl, countryCode, latitude, propertyType, zoom),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new VisionAnalysisTimeoutError()), timeoutMs);
       }),
