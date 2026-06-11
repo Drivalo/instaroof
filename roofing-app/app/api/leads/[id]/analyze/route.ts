@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const lat = Number(lead.latitude);
     const metersPerPixelApprox =
       Number.isFinite(lat) && Math.abs(lat) <= 85
-        ? (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, visionSatelliteZoom) / 2
+        ? (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, SATELLITE_STATIC_ZOOM) / 2
         : null;
     const tileSpanMetresApprox =
       metersPerPixelApprox != null ? Math.round(metersPerPixelApprox * 1200) : null;
@@ -131,7 +131,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         lead.country_code,
         lead.latitude,
         typeof lead.property_type === "string" ? lead.property_type.trim() || null : null,
-        visionSatelliteZoom,
       );
     } catch (visionError) {
       const fallbackRegion = detectCoordinateFallbackRegion(

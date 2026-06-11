@@ -528,7 +528,6 @@ async function runVisionAnalysisInner(
   countryCode: string | null | undefined,
   latitude?: number | null,
   propertyType?: string | null,
-  zoom: number = SATELLITE_STATIC_ZOOM,
 ): Promise<VisionAnalysis> {
   console.info(`${LOG_PREFIX} runVisionAnalysisInner start`);
   const apiKey = getOpenAiApiKey();
@@ -550,9 +549,10 @@ async function runVisionAnalysisInner(
   console.info(`${LOG_PREFIX} Sending to GPT-4o:`, {
     satelliteUrl: maskGoogleMapsKeyInUrl(imageUrl),
     encodedPayloadKb: encodedKb,
-    zoom,
+    zoom: SATELLITE_STATIC_ZOOM,
     satellite_tile_pixels: "600x600 at scale 2 (1200px effective)",
-    satellite_tile_note: `At zoom ${zoom} the image can cover a few hundred metres across; AI may over-estimate if it measures the full tile or footprint instead of roof surface only`,
+    satellite_tile_note:
+      "At zoom 19 the image can cover a few hundred metres across; AI may over-estimate if it measures the full tile or footprint instead of roof surface only",
   });
 
   console.info(`${LOG_PREFIX} Calling OpenAI gpt-4o chat/completions…`);
@@ -651,7 +651,6 @@ export async function runVisionAnalysis(
   countryCode?: string | null,
   latitude?: number | null,
   propertyType?: string | null,
-  zoom: number = SATELLITE_STATIC_ZOOM,
 ): Promise<VisionAnalysis> {
   ensureEnvLoaded();
   const timeoutMs = VISION_ANALYSIS_TIMEOUT_MS;
@@ -663,7 +662,7 @@ export async function runVisionAnalysis(
 
   try {
     const result = await Promise.race([
-      runVisionAnalysisInner(imageUrl, countryCode, latitude, propertyType, zoom),
+      runVisionAnalysisInner(imageUrl, countryCode, latitude, propertyType),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new VisionAnalysisTimeoutError()), timeoutMs);
       }),
