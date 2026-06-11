@@ -28,12 +28,12 @@ const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly Prope
     {
       label: "House",
       sqm: 160,
-      description: "Freestanding home, own roof",
+      description: "Freestanding home on a standard suburban block",
     },
     {
       label: "Acreage",
       sqm: 220,
-      description: "Large block or rural property",
+      description: "Rural property or large block over 2,000m²",
     },
   ],
   nz: [
