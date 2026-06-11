@@ -723,13 +723,18 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       {hasQuoteEstimates && hasRoofSqft && lead?.vision_roof_visible !== false ? (
         <div className="mt-4 grid md:grid-cols-2 gap-3 max-w-[600px]">
-          <p
+          <div
             className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
               !imperialRoofMeasurements ? "md:col-span-2" : ""
             }`}
           >
-            Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
-          </p>
+            <p>
+              Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
+            </p>
+            <p className="mt-1 text-xs text-muted leading-snug">
+              Estimates may vary ±20%. Your roofer will confirm exact measurements on site.
+            </p>
+          </div>
           {imperialRoofMeasurements ? (
             <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
               Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
