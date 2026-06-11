@@ -518,6 +518,7 @@ async function runVisionAnalysisInner(
     throw new VisionUnableToEstimateError(VISION_UNABLE_MESSAGE, "OPENAI_API_KEY not configured");
   }
 
+  console.log(`${LOG_PREFIX} Google Maps Static API URL (full, before GPT-4o):`, imageUrl);
   const imageDataUrl = await satelliteImageToDataUrl(imageUrl, VISION_ANALYSIS_TIMEOUT_MS);
   const encodedKb = Math.round(imageDataUrl.length / 1024);
   const tileSpanMetres =

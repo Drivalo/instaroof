@@ -14,11 +14,16 @@ export function maskGoogleMapsKeyInUrl(url: string) {
 }
 
 /** Google Static Maps satellite image URL (server-side fetch / vision). */
-export function mapsStaticSatelliteUrl(lat: number, lng: number, googleMapsApiKey?: string | null) {
+export function mapsStaticSatelliteUrl(
+  lat: number,
+  lng: number,
+  googleMapsApiKey?: string | null,
+  zoom: number = SATELLITE_STATIC_ZOOM,
+) {
   const apiKey = getGoogleMapsApiKey(googleMapsApiKey);
   const params = new URLSearchParams({
     center: `${lat},${lng}`,
-    zoom: String(SATELLITE_STATIC_ZOOM),
+    zoom: String(zoom),
     size: "600x600",
     scale: "2",
     maptype: "satellite",
