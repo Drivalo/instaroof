@@ -518,7 +518,7 @@ async function runVisionAnalysisInner(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         response_format: { type: "json_object" },
         temperature: 0.1,
         max_tokens: 128,
