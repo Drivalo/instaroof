@@ -139,7 +139,7 @@ Human identification is not part of this task. Do not name, count, describe, or 
 
 const AU_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   townhouse:
-    "This is an Australian townhouse. Roof covers one floor only, typically 40–80 sqm. Do not include adjacent townhouses, garages, or carports.",
+    "This is an Australian townhouse or terrace. Roof covers one floor only, typically 60–110 sqm. Do not underestimate large Victorian terraces.",
   house:
     "This is an Australian detached house. Single storey roofs are typically 180–350 sqm. Do not anchor to the lower end of the range for large properties.",
   acreage:
@@ -154,7 +154,7 @@ const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   "semi-detached":
     "This is a UK semi-detached house. Roof area typically 70–120 sqm. Measure only this property's half of the roof, not the neighbour's.",
   detached:
-    "This is a UK detached house. Roof area typically 100–200 sqm for standard properties, up to 250 sqm for larger homes. Do not underestimate — measure the full roof including any attached garage.",
+    "This is a UK detached house. Roof area typically 100–170 sqm for standard properties. Do not overestimate — measure only the primary roof including any attached garage, exclude gardens and driveways.",
   bungalow:
     "This is a UK bungalow. Single storey, roof area typically 80–150 sqm.",
   flat:
