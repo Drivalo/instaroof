@@ -29,7 +29,7 @@ export function mapsStaticSatelliteUrl(
     maptype: "satellite",
   });
   if (apiKey) params.set("key", apiKey);
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}&markers=color:red%7C${lat},${lng}`;
 }
 
 /** Same-origin proxy path for browser display (keeps key on server). */
