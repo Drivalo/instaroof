@@ -11,7 +11,7 @@ import { hasGoogleMapsKey } from "@/lib/google-maps-script";
 import { STAGE1_ROOF_SIZE_LABEL, formatRoofAreaDisplay, previewPriceRangeFromEstimate } from "@/lib/roof-estimate";
 import type { SupportedCountryCode } from "@/lib/supported-countries";
 
-type PropertyTypeOption = { label: string; sqm: number };
+type PropertyTypeOption = { label: string; sqm: number; description?: string };
 
 const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly PropertyTypeOption[]> = {
   gb: [
@@ -20,9 +20,21 @@ const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly Prope
     { label: "Detached", sqm: 150 },
   ],
   au: [
-    { label: "Townhouse", sqm: 110 },
-    { label: "House", sqm: 160 },
-    { label: "Acreage", sqm: 220 },
+    {
+      label: "Townhouse",
+      sqm: 110,
+      description: "Attached dwelling, shared walls, own roof section",
+    },
+    {
+      label: "House",
+      sqm: 160,
+      description: "Freestanding home, own roof",
+    },
+    {
+      label: "Acreage",
+      sqm: 220,
+      description: "Large block or rural property",
+    },
   ],
   nz: [
     { label: "Townhouse", sqm: 100 },
@@ -366,7 +378,16 @@ export default function Home() {
                         propertyType === option.label ? propertyChoiceSelected : propertyChoiceBase
                       }
                     >
-                      {option.label}
+                      <span>{option.label}</span>
+                      {option.description ? (
+                        <span
+                          className={`mt-1 block text-xs leading-snug ${
+                            propertyType === option.label ? "text-[#1C1C1C]/80" : "text-muted"
+                          }`}
+                        >
+                          {option.description}
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
