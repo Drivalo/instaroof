@@ -799,7 +799,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
 
       {hasQuoteEstimates ? (
         <p className="mt-3 text-sm text-muted max-w-[600px]">
-          Starting estimate based on AI satellite analysis. Your roofer will confirm the final price on inspection.
+          Starting estimate based on AI satellite analysis.
         </p>
       ) : null}
 
