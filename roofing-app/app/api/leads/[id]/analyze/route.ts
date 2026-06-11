@@ -118,7 +118,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let analysisSource = "gpt4o_vision";
 
     try {
-      analysis = await runVisionAnalysis(staticUrlForVision, lead.country_code, lead.latitude);
+      analysis = await runVisionAnalysis(
+        staticUrlForVision,
+        lead.country_code,
+        lead.latitude,
+        typeof lead.property_type === "string" ? lead.property_type.trim() || null : null,
+      );
     } catch (visionError) {
       const fallbackRegion = detectCoordinateFallbackRegion(
         lead.latitude,
