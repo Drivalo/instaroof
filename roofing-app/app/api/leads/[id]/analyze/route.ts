@@ -205,19 +205,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         adjusted_sqm: roofAreaSqm,
         property_type: propertyType,
       });
-    } else if (
-      countryCode === "AU" &&
-      propertyType.toLowerCase() === "townhouse" &&
-      roofAreaSqmRaw != null &&
-      roofAreaSqmRaw > 0
-    ) {
-      const originalSqm = roofAreaSqmRaw;
-      roofAreaSqm = originalSqm * 0.5;
-      console.info("[vision/analyze] AU townhouse multiplier applied", {
-        original_sqm: originalSqm,
-        adjusted_sqm: roofAreaSqm,
-        property_type: propertyType,
-      });
     }
 
     const stage1Region = stage1CountryRegion(lead.country_code, lead.address);
