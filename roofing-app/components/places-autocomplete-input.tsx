@@ -66,7 +66,9 @@ export function PlacesAutocompleteInput({
         autocompleteRef.current = instance;
 
         instance.addListener("place_changed", () => {
-          const parsed = parseGooglePlace(instance.getPlace());
+          const placeDetails = instance.getPlace();
+          console.log("[places] full place details:", placeDetails);
+          const parsed = parseGooglePlace(placeDetails);
           if (!parsed) return;
 
           skipChangeRef.current = true;

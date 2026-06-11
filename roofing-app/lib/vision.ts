@@ -137,12 +137,39 @@ Measure ONLY the roof of the single residential property at the centre of the im
 
 Human identification is not part of this task. Do not name, count, describe, or infer people, occupants, vehicles, or personal information.`;
 
+const AU_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
+  townhouse:
+    "This is an Australian townhouse. Roof covers one floor only, typically 40–80 sqm. Do not include adjacent townhouses, garages, or carports.",
+  house:
+    "This is an Australian detached house. Single storey roofs are typically 180–350 sqm. Do not anchor to the lower end of the range for large properties.",
+  acreage:
+    "This is an Australian acreage property. Roof area typically 250–500 sqm including outbuildings if attached.",
+  apartment:
+    "This is an apartment. Measure only the roof of the individual unit footprint, typically 50–90 sqm.",
+};
+
 function buildVisionUserPrompt(
   countryCode: string | null | undefined,
   tileSpanMetres?: number,
+  propertyType: string | null = null,
 ): string {
   const country = normalizeVisionCountry(countryCode);
   const guidance = countryRoofSizeGuidance(countryCode);
+  const trimmedPropertyType = propertyType?.trim() ?? "";
+  let propertyTypeLine = "";
+  if (trimmedPropertyType) {
+    const code = String(countryCode ?? "")
+      .trim()
+      .toUpperCase();
+    if (code === "AU") {
+      const auGuidance = AU_PROPERTY_TYPE_GUIDANCE[trimmedPropertyType.toLowerCase()];
+      if (auGuidance) {
+        propertyTypeLine = `\n\n${auGuidance}`;
+      }
+    } else {
+      propertyTypeLine = `\n\nProperty type: ${trimmedPropertyType}. Use this to calibrate your estimate.`;
+    }
+  }
   const scaleReference =
     tileSpanMetres != null
       ? `\n\nThe satellite tile covers approximately ${tileSpanMetres} metres across — use this as a scale reference when estimating roof area.`
@@ -151,7 +178,7 @@ function buildVisionUserPrompt(
 
 CRITICAL: Measure ONLY the roof of the single residential property at the centre of the image. Do not include neighbouring roofs, the full building footprint on multiple lots, gardens, roads, or the entire satellite tile.
 
-Regional context (${country}): ${guidance}
+Regional context (${country}): ${guidance}${propertyTypeLine}
 
 If your estimate exceeds 400 sqm for a single residential property, you are likely measuring too large an area. Remeasure focusing only on the central property's roof.
 
@@ -482,6 +509,7 @@ async function runVisionAnalysisInner(
   imageUrl: string,
   countryCode: string | null | undefined,
   latitude?: number | null,
+  propertyType?: string | null,
 ): Promise<VisionAnalysis> {
   console.info(`${LOG_PREFIX} runVisionAnalysisInner start`);
   const apiKey = getOpenAiApiKey();
@@ -529,7 +557,7 @@ async function runVisionAnalysisInner(
             content: [
               {
                 type: "text",
-                text: buildVisionUserPrompt(countryCode, tileSpanMetres),
+                text: buildVisionUserPrompt(countryCode, tileSpanMetres, propertyType ?? null),
               },
               {
                 type: "image_url",
@@ -603,6 +631,7 @@ export async function runVisionAnalysis(
   imageUrl: string,
   countryCode?: string | null,
   latitude?: number | null,
+  propertyType?: string | null,
 ): Promise<VisionAnalysis> {
   ensureEnvLoaded();
   const timeoutMs = VISION_ANALYSIS_TIMEOUT_MS;
@@ -614,7 +643,7 @@ export async function runVisionAnalysis(
 
   try {
     const result = await Promise.race([
-      runVisionAnalysisInner(imageUrl, countryCode, latitude),
+      runVisionAnalysisInner(imageUrl, countryCode, latitude, propertyType),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new VisionAnalysisTimeoutError()), timeoutMs);
       }),
