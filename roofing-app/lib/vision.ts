@@ -543,7 +543,7 @@ async function runVisionAnalysisInner(
   const tileSpanMetres =
     latitude != null
       ? Math.round(
-          (156543.03392 * Math.cos(((latitude ?? 0) * Math.PI) / 180) / Math.pow(2, zoom)) *
+          (156543.03392 * Math.cos(((latitude ?? 0) * Math.PI) / 180) / Math.pow(2, SATELLITE_STATIC_ZOOM)) *
             600,
         )
       : undefined;
