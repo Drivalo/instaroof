@@ -94,8 +94,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const propertyTypeForZoom = typeof lead.property_type === "string" ? lead.property_type.trim() : "";
+    const countryCodeForZoom = String(lead.country_code ?? "").trim().toUpperCase();
     const visionSatelliteZoom =
-      propertyTypeForZoom === "Acreage" ? 17 : propertyTypeForZoom === "House" ? 18 : 19;
+      propertyTypeForZoom === "Acreage"
+        ? 17
+        : propertyTypeForZoom === "House" ||
+            (countryCodeForZoom === "GB" && propertyTypeForZoom === "Detached")
+          ? 18
+          : 19;
     const staticUrlForVision = mapsStaticSatelliteUrl(
       lead.latitude,
       lead.longitude,
@@ -192,20 +198,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const propertyType = String(leadPropertyFields?.property_type ?? "").trim();
 
     let roofAreaSqm = roofAreaSqmRaw;
-    if (
-      countryCode === "GB" &&
-      propertyType.toLowerCase() === "detached" &&
-      roofAreaSqmRaw != null &&
-      roofAreaSqmRaw > 0
-    ) {
-      const originalSqm = roofAreaSqmRaw;
-      roofAreaSqm = originalSqm * 1.5;
-      console.info("[vision/analyze] UK detached multiplier applied", {
-        original_sqm: originalSqm,
-        adjusted_sqm: roofAreaSqm,
-        property_type: propertyType,
-      });
-    }
 
     const stage1Region = stage1CountryRegion(lead.country_code, lead.address);
     const stage1MedianSqm = stage1MedianRoofSqm(lead.country_code, lead.address);
