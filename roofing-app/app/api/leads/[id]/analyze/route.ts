@@ -198,6 +198,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const propertyType = String(leadPropertyFields?.property_type ?? "").trim();
 
     let roofAreaSqm = roofAreaSqmRaw;
+    const propertyTypeLower = propertyType.toLowerCase();
+    if (
+      countryCode === "GB" &&
+      (propertyTypeLower === "detached" || propertyTypeLower.startsWith("large detached")) &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.2;
+      console.info("[vision/analyze] GB detached/large detached 1.2x multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
+      });
+    }
 
     const stage1Region = stage1CountryRegion(lead.country_code, lead.address);
     const stage1MedianSqm = stage1MedianRoofSqm(lead.country_code, lead.address);

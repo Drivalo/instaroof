@@ -150,15 +150,15 @@ const AU_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
 
 const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   terraced:
-    "This is a UK terraced house. Roof area typically 50–80 sqm. Measure only this property's roof section, not neighbouring terraces.",
+    "This is a UK terraced house. Roof covers one section only, typically 50–65 sqm. Do not include neighbouring terraces.",
   "semi-detached":
-    "This is a UK semi-detached house. Roof area typically 70–120 sqm. Measure only this property's half of the roof, not the neighbour's.",
+    "This is a UK semi-detached house. Roof area typically 65–80 sqm. Measure only this property's half of the roof, not the neighbour's.",
   detached:
-    "This is a UK detached house. Roof area typically 140–200 sqm for standard properties. Do not underestimate — measure the full roof including any attached garage.",
+    "This is a UK detached house. Roof area typically 80–130 sqm. Do not overestimate compact properties.",
+  "large detached":
+    "This is a large UK detached house with 4 or more bedrooms. Roof area typically 130–200 sqm. Measure the full roof including any attached garage.",
   bungalow:
-    "This is a UK bungalow. Single storey, roof area typically 80–150 sqm.",
-  flat:
-    "This is a UK flat or apartment. Measure only the roof of the individual unit footprint, typically 40–70 sqm.",
+    "This is a UK bungalow. Single storey, roof area typically 80–120 sqm.",
 };
 
 function buildVisionUserPrompt(
