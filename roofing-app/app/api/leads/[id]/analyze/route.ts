@@ -201,13 +201,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const propertyTypeLower = propertyType.toLowerCase();
     if (
       countryCode === "GB" &&
-      (propertyTypeLower === "detached" || propertyTypeLower.startsWith("large detached")) &&
+      propertyTypeLower === "detached" &&
       roofAreaSqmRaw != null &&
       roofAreaSqmRaw > 0
     ) {
       const originalSqm = roofAreaSqmRaw;
       roofAreaSqm = originalSqm * 1.2;
-      console.info("[vision/analyze] GB detached/large detached 1.2x multiplier applied", {
+      console.info("[vision/analyze] GB detached 1.2x multiplier applied", {
         original_sqm: originalSqm,
         adjusted_sqm: roofAreaSqm,
         property_type: propertyType,
