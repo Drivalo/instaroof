@@ -155,7 +155,7 @@ const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
     "This is a UK semi-detached house. Roof area typically 65–80 sqm. Measure only this property's half of the roof, not the neighbour's.",
   detached:
     "This is a UK detached house. Roof area typically 80–130 sqm. Do not overestimate compact properties.",
-  "large detached":
+  "large detached (4+ beds)":
     "This is a large UK detached house with 4 or more bedrooms. Roof area typically 130–200 sqm. Measure the full roof including any attached garage.",
   bungalow:
     "This is a UK bungalow. Single storey, roof area typically 80–120 sqm.",
