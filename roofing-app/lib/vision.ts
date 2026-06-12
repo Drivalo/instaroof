@@ -152,7 +152,7 @@ const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   terraced:
     "This is a UK terraced house. Roof covers one section only, typically 50–65 sqm. Do not include neighbouring terraces.",
   "semi-detached":
-    "This is a UK semi-detached house. Roof area typically 65–80 sqm. Measure only this property's half of the roof, not the neighbour's.",
+    "This is a UK semi-detached house. Roof area typically 80–120 sqm. Include full eave overhangs in your measurement.",
   detached:
     "This is a UK detached house. Roof area typically 80–130 sqm. Do not overestimate compact properties.",
   bungalow:
