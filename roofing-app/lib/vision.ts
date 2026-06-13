@@ -150,7 +150,7 @@ const AU_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
 
 const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   terraced:
-    "This is a UK terraced house. Roof covers one section only, typically 50–65 sqm. Do not include neighbouring terraces.",
+    "This is a UK terraced house. Include full eave overhangs in your measurement. Measure only this property's roof section.",
   "semi-detached":
     "This is a UK semi-detached house. Include full eave overhangs in your measurement. Measure only this property's side of the roof.",
   detached:
