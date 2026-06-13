@@ -156,7 +156,7 @@ const GB_PROPERTY_TYPE_GUIDANCE: Record<string, string> = {
   detached:
     "This is a UK detached house. Roof area typically 80–130 sqm. Do not overestimate compact properties.",
   bungalow:
-    "This is a UK bungalow. Single storey, roof area typically 80–120 sqm.",
+    "This is a UK bungalow. Single storey property — the roof covers the entire footprint. Include full eave overhangs in your measurement.",
 };
 
 function buildVisionUserPrompt(
