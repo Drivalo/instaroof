@@ -100,7 +100,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         ? 17
         : propertyTypeForZoom === "House" ||
             (countryCodeForZoom === "GB" &&
-              (propertyTypeForZoom === "Detached" || propertyTypeForZoom === "Semi-detached"))
+              (propertyTypeForZoom === "Detached" ||
+                propertyTypeForZoom === "Semi-detached" ||
+                propertyTypeForZoom === "Terraced"))
           ? 18
           : 19;
     const staticUrlForVision = mapsStaticSatelliteUrl(
