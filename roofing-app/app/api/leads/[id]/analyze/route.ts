@@ -244,6 +244,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         property_type: propertyType,
       });
     }
+    if (
+      countryCode === "GB" &&
+      propertyTypeLower === "bungalow" &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.3;
+      console.info("[vision/analyze] GB bungalow 1.3x multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
+      });
+    }
 
     const stage1Region = stage1CountryRegion(lead.country_code, lead.address);
     const stage1MedianSqm = stage1MedianRoofSqm(lead.country_code, lead.address);
