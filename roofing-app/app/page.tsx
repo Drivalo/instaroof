@@ -18,6 +18,7 @@ const COUNTRY_PROPERTY_TYPE_OPTIONS: Record<SupportedCountryCode, readonly Prope
     { label: "Terraced", sqm: 70 },
     { label: "Semi-detached", sqm: 90 },
     { label: "Detached", sqm: 150 },
+    { label: "Bungalow", sqm: 100 },
   ],
   au: [
     {

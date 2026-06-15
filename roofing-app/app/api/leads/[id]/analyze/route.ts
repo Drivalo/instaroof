@@ -94,8 +94,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const propertyTypeForZoom = typeof lead.property_type === "string" ? lead.property_type.trim() : "";
+    const countryCodeForZoom = String(lead.country_code ?? "").trim().toUpperCase();
     const visionSatelliteZoom =
-      propertyTypeForZoom === "Acreage" ? 17 : propertyTypeForZoom === "House" ? 18 : 19;
+      propertyTypeForZoom === "Acreage"
+        ? 17
+        : propertyTypeForZoom === "House" ||
+            (countryCodeForZoom === "GB" &&
+              (propertyTypeForZoom === "Detached" ||
+                propertyTypeForZoom === "Semi-detached" ||
+                propertyTypeForZoom === "Terraced"))
+          ? 18
+          : 19;
     const staticUrlForVision = mapsStaticSatelliteUrl(
       lead.latitude,
       lead.longitude,
@@ -192,15 +201,58 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const propertyType = String(leadPropertyFields?.property_type ?? "").trim();
 
     let roofAreaSqm = roofAreaSqmRaw;
+    const propertyTypeLower = propertyType.toLowerCase();
     if (
       countryCode === "GB" &&
-      propertyType.toLowerCase() === "detached" &&
+      propertyTypeLower === "detached" &&
       roofAreaSqmRaw != null &&
       roofAreaSqmRaw > 0
     ) {
       const originalSqm = roofAreaSqmRaw;
-      roofAreaSqm = originalSqm * 1.5;
-      console.info("[vision/analyze] UK detached multiplier applied", {
+      roofAreaSqm = originalSqm * 1.2;
+      console.info("[vision/analyze] GB detached 1.2x multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
+      });
+    }
+    if (
+      countryCode === "GB" &&
+      propertyTypeLower === "semi-detached" &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.2;
+      console.info("[vision/analyze] GB semi-detached 1.2x multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
+      });
+    }
+    if (
+      countryCode === "GB" &&
+      propertyTypeLower === "terraced" &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.05;
+      console.info("[vision/analyze] GB terraced 1.05x multiplier applied", {
+        original_sqm: originalSqm,
+        adjusted_sqm: roofAreaSqm,
+        property_type: propertyType,
+      });
+    }
+    if (
+      countryCode === "GB" &&
+      propertyTypeLower === "bungalow" &&
+      roofAreaSqmRaw != null &&
+      roofAreaSqmRaw > 0
+    ) {
+      const originalSqm = roofAreaSqmRaw;
+      roofAreaSqm = originalSqm * 1.3;
+      console.info("[vision/analyze] GB bungalow 1.3x multiplier applied", {
         original_sqm: originalSqm,
         adjusted_sqm: roofAreaSqm,
         property_type: propertyType,
