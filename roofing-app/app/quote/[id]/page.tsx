@@ -654,6 +654,28 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
         </h1>
       ) : null}
 
+      {hasQuoteEstimates && hasRoofSqft && lead?.vision_roof_visible !== false ? (
+        <div className="mt-4 grid md:grid-cols-2 gap-3 max-w-[600px]">
+          <div
+            className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
+              !imperialRoofMeasurements ? "md:col-span-2" : ""
+            }`}
+          >
+            <p>
+              Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
+            </p>
+            <p className="mt-1 text-xs text-muted leading-snug">
+              Estimates may vary ±20%. Your roofer will confirm exact measurements on site.
+            </p>
+          </div>
+          {imperialRoofMeasurements ? (
+            <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
+              Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {detailsUnlocked && lead?.vision_roof_visible !== false && settings && hasRoofSqft ? (
         <section className="mt-4 max-w-[600px] w-full" aria-labelledby="quote-revealed-title">
           <h2 id="quote-revealed-title" className="text-lg text-foreground">
@@ -671,7 +693,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               />
               {showBookInspectionCta ? (
                 <Link href={`/book/${id}`} className={bookInspectionLinkClass}>
-                  Book my free inspection
+                  Book my no-obligation free inspection
                 </Link>
               ) : null}
             </div>
@@ -684,7 +706,7 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
               />
               {showBookInspectionCta ? (
                 <Link href={`/book/${id}`} className={bookInspectionLinkClass}>
-                  Book my free inspection
+                  Book my no-obligation free inspection
                 </Link>
               ) : null}
             </div>
@@ -723,28 +745,6 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
       <p className="mt-4 text-sm text-muted max-w-[600px]">
         Property: <strong className="text-foreground">{customerAddress || "Address not saved"}</strong>
       </p>
-
-      {hasQuoteEstimates && hasRoofSqft && lead?.vision_roof_visible !== false ? (
-        <div className="mt-4 grid md:grid-cols-2 gap-3 max-w-[600px]">
-          <div
-            className={`rounded-lg border border-border-subtle bg-surface p-3 text-foreground ${
-              !imperialRoofMeasurements ? "md:col-span-2" : ""
-            }`}
-          >
-            <p>
-              Estimated roof size: <strong>{roofAreaDisplay.area}</strong>
-            </p>
-            <p className="mt-1 text-xs text-muted leading-snug">
-              Estimates may vary ±20%. Your roofer will confirm exact measurements on site.
-            </p>
-          </div>
-          {imperialRoofMeasurements ? (
-            <p className="rounded-lg border border-border-subtle bg-surface p-3 text-foreground">
-              Estimated squares: <strong>{roofAreaDisplay.squares ?? "—"}</strong>
-            </p>
-          ) : null}
-        </div>
-      ) : null}
 
       {lead?.vision_roof_visible === false ? (
         <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 max-w-[600px] leading-relaxed">
@@ -789,11 +789,8 @@ export default function QuotePage({ params }: { params: Promise<{ id: string }> 
             href={`/book/${id}`}
             className="flex w-full items-center justify-center rounded-xl bg-[#F5A623] px-8 py-4 text-lg font-medium text-[#1C1C1C] tracking-wide transition-opacity hover:opacity-90"
           >
-            Book my free inspection
+            Book my no-obligation free inspection
           </Link>
-          <p className="mt-3 text-center text-sm text-muted">
-            Final price confirmed on site. No obligation.
-          </p>
         </section>
       )}
 
