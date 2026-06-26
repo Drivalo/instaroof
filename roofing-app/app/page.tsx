@@ -402,9 +402,7 @@ export default function Home() {
                 {loadingPreview ? "Estimating…" : "Get My Instant Estimate"}
               </button>
               <p className="text-sm text-muted leading-relaxed">
-                {selectedCountry === "gb"
-                  ? "Best suited for terraced and semi-detached homes. For larger or more complex properties, your roofer will confirm the accurate measurement on inspection."
-                  : "Best suited for standard residential properties. For larger or more complex properties, your roofer will confirm the accurate measurement on inspection."}
+                Estimates are based on satellite imagery and work best for standard residential roofs. Larger or unusually shaped properties may need extra time on-site to measure accurately.
               </p>
             </div>
 
